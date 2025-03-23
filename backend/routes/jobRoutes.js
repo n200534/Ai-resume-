@@ -1,31 +1,29 @@
 const express = require("express");
-const { authMiddleware, roleMiddleware } = require("../middlewares/authMiddleware");
+const { predictJobSuccess } = require("../services/jobMatchingservice");
 const Job = require("../models/JobModel");
+const { authMiddleware, roleMiddleware } = require("../middlewares/authMiddleware");
 
 const router = express.Router();
 
-// Create a new Job (Only for Recruiters)
+// Post a Job
 router.post("/create", authMiddleware, roleMiddleware("recruiter"), async (req, res) => {
-  try {
-    const { title, company, description, requiredSkills } = req.body;
+  const newJob = new Job({ ...req.body, postedBy: req.user.userId });
+  await newJob.save();
+  res.json({ message: "Job posted successfully", job: newJob });
+});
 
-    if (!title || !company || !description || !requiredSkills) {
-      return res.status(400).json({ error: "All fields are required" });
-    }
+// Get Job Recommendations
+router.get("/match-jobs", authMiddleware, async (req, res) => {
+  const resume = await Resume.findOne({ userId: req.user.userId });
+  if (!resume) return res.status(404).json({ error: "Resume not found" });
 
-    const newJob = new Job({
-      recruiterId: req.user.userId,
-      title,
-      company,
-      description,
-      requiredSkills,
-    });
+  const jobs = await Job.find();
+  const matchedJobs = jobs.map(job => ({
+    ...job.toObject(),
+    matchScore: predictJobSuccess(resume, job)
+  }));
 
-    await newJob.save();
-    res.json({ message: "Job posted successfully", job: newJob });
-  } catch (err) {
-    res.status(500).json({ error: "Server error" });
-  }
+  res.json({ matchedJobs });
 });
 
 module.exports = router;

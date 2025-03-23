@@ -1,32 +1,40 @@
 const express = require("express");
 const multer = require("multer");
-const { authMiddleware, roleMiddleware } = require("../middlewares/authMiddleware");
+const pdfParse = require("pdf-parse");
+const { analyzeResume } = require("../services/geminiService");
+const { generateResumeReport } = require("../services/pdfgenerator");
 const Resume = require("../models/ResumeModel");
+const { authMiddleware } = require("../middlewares/authMiddleware");
 
 const router = express.Router();
+const upload = multer({ dest: "uploads/" });
 
-// Set up Multer for file uploads
-const storage = multer.memoryStorage();
-const upload = multer({ storage });
+// Upload & Analyze Resume
+router.post("/upload", authMiddleware, upload.single("resume"), async (req, res) => {
+  const data = await pdfParse(req.file.path);
+  const analysis = await analyzeResume(data.text);
 
-// Upload Resume (Only for Candidates)
-router.post("/upload", authMiddleware, roleMiddleware("candidate"), upload.single("resume"), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+  const newResume = new Resume({
+    userId: req.user.userId,
+    name: req.body.name,
+    email: req.body.email,
+    skills: analysis.skills,
+    experience: analysis.experience,
+    aiFeedback: analysis.feedback,
+    extractedText: data.text
+  });
+  await newResume.save();
 
-    // Extract Resume Data (Later we'll process it with AI)
-    const newResume = new Resume({
-      userId: req.user.userId,
-      name: req.body.name,
-      email: req.body.email,
-      extractedText: "Dummy extracted text (AI processing later)", // Placeholder for AI processing
-    });
+  res.json({ message: "Resume uploaded and analyzed", resume: newResume });
+});
 
-    await newResume.save();
-    res.json({ message: "Resume uploaded successfully", resume: newResume });
-  } catch (err) {
-    res.status(500).json({ error: "Server error" });
-  }
+// Generate Resume Review Report
+router.get("/resume-report/:resumeId", authMiddleware, async (req, res) => {
+  const resume = await Resume.findById(req.params.resumeId);
+  if (!resume) return res.status(404).json({ error: "Resume not found" });
+
+  const filePath = await generateResumeReport(resume);
+  res.download(filePath);
 });
 
 module.exports = router;

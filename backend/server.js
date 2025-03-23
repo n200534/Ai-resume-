@@ -30,7 +30,7 @@ mongoose
   .connect("mongodb+srv://amavarapuakshaykumar:akshay_321@cluster0.fxgc0.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
   .then(() => {
     app.listen(5001, () => {
-      console.log("Database connected and server running at port 5000");
+      console.log("Database connected and server running at port 5001");
     });
   })
   .catch((err) => console.log(err));
