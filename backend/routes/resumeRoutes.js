@@ -10,23 +10,35 @@ const router = express.Router();
 const upload = multer({ dest: "uploads/" });
 
 // Upload & Analyze Resume
-router.post("/upload", authMiddleware, upload.single("resume"), async (req, res) => {
-  const data = await pdfParse(req.file.path);
-  const analysis = await analyzeResume(data.text);
+router.post(
+  "/upload",
+  authMiddleware,
+  upload.single("resume"),
+  async (req, res) => {
+    console.log("Received request:", req.body); // Log body data
+    console.log("File:", req.file); // Log uploaded file
 
-  const newResume = new Resume({
-    userId: req.user.userId,
-    name: req.body.name,
-    email: req.body.email,
-    skills: analysis.skills,
-    experience: analysis.experience,
-    aiFeedback: analysis.feedback,
-    extractedText: data.text
-  });
-  await newResume.save();
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
 
-  res.json({ message: "Resume uploaded and analyzed", resume: newResume });
-});
+    const data = await pdfParse(req.file.path);
+    const analysis = await analyzeResume(data.text);
+
+    const newResume = new Resume({
+      userId: req.user.userId,
+      name: req.body.name,
+      email: req.body.email,
+      skills: analysis.skills,
+      experience: analysis.experience,
+      aiFeedback: analysis.feedback,
+      extractedText: data.text,
+    });
+    await newResume.save();
+
+    res.json({ message: "Resume uploaded and analyzed", resume: newResume });
+  }
+);
 
 // Generate Resume Review Report
 router.get("/resume-report/:resumeId", authMiddleware, async (req, res) => {
