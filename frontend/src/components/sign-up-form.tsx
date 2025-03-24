@@ -14,6 +14,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+interface ValidationError {
+  field: string;
+  message: string;
+}
+
 export function SignUpForm({
   className,
   ...props
@@ -25,11 +30,26 @@ export function SignUpForm({
   const [role, setRole] = useState<"candidate" | "recruiter" | "">("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setFieldErrors({});
     setLoading(true);
+
+    // Basic client-side validation
+    const validationErrors: Record<string, string> = {};
+    if (!name.trim()) validationErrors.name = "Name is required";
+    if (!email.trim()) validationErrors.email = "Email is required";
+    if (!password) validationErrors.password = "Password is required";
+    if (!role) validationErrors.role = "Role is required";
+
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors);
+      setLoading(false);
+      return;
+    }
 
     try {
       const response = await fetch("http://localhost:5001/api/auth/signup", {
@@ -43,15 +63,27 @@ export function SignUpForm({
       const data = await response.json();
 
       if (!response.ok) {
+        // Handle validation errors or specific error messages
+        if (data.errors) {
+          // Handle multiple validation errors
+          const errorMap: Record<string, string> = {};
+          data.errors.forEach((err: ValidationError) => {
+            errorMap[err.field] = err.message;
+          });
+          setFieldErrors(errorMap);
+          throw new Error("Signup validation failed");
+        }
+
+        // Handle single error message
         throw new Error(data.error || "Sign-up failed");
       }
 
       // Store token & role
       localStorage.setItem("token", data.token);
-      localStorage.setItem("userRole", role);
+      localStorage.setItem("userRole", data.user.role);
 
       // Redirect based on role
-      router.push(role === "candidate" ? "/jobs" : "/post-job");
+      router.push(data.user.role === "candidate" ? "/jobs" : "/post-job");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -61,7 +93,7 @@ export function SignUpForm({
 
   return (
     <div
-      className={cn("flex  items-center justify-center p-6", className)}
+      className={cn("flex items-center justify-center p-6", className)}
       {...props}
     >
       <Card className="w-full max-w-md shadow-xl border border-[#162660] bg-white rounded-lg">
@@ -76,6 +108,7 @@ export function SignUpForm({
         <CardContent>
           <form onSubmit={handleSignUp}>
             <div className="flex flex-col gap-5">
+              {/* Name Input */}
               <div className="grid gap-2">
                 <Label htmlFor="name" className="text-[#162660] font-medium">
                   Full Name
@@ -84,13 +117,20 @@ export function SignUpForm({
                   id="name"
                   type="text"
                   placeholder="John Doe"
-                  required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="border border-[#162660] focus:ring-[#D0E6FD]"
+                  className={`border ${
+                    fieldErrors.name 
+                      ? "border-red-500" 
+                      : "border-[#162660]"
+                  } focus:ring-[#D0E6FD]`}
                 />
+                {fieldErrors.name && (
+                  <p className="text-red-500 text-sm">{fieldErrors.name}</p>
+                )}
               </div>
 
+              {/* Email Input */}
               <div className="grid gap-2">
                 <Label htmlFor="email" className="text-[#162660] font-medium">
                   Email
@@ -99,13 +139,20 @@ export function SignUpForm({
                   id="email"
                   type="email"
                   placeholder="m@example.com"
-                  required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="border border-[#162660] focus:ring-[#D0E6FD]"
+                  className={`border ${
+                    fieldErrors.email 
+                      ? "border-red-500" 
+                      : "border-[#162660]"
+                  } focus:ring-[#D0E6FD]`}
                 />
+                {fieldErrors.email && (
+                  <p className="text-red-500 text-sm">{fieldErrors.email}</p>
+                )}
               </div>
 
+              {/* Password Input */}
               <div className="grid gap-2">
                 <Label
                   htmlFor="password"
@@ -116,13 +163,20 @@ export function SignUpForm({
                 <Input
                   id="password"
                   type="password"
-                  required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="border border-[#162660] focus:ring-[#D0E6FD]"
+                  className={`border ${
+                    fieldErrors.password 
+                      ? "border-red-500" 
+                      : "border-[#162660]"
+                  } focus:ring-[#D0E6FD]`}
                 />
+                {fieldErrors.password && (
+                  <p className="text-red-500 text-sm">{fieldErrors.password}</p>
+                )}
               </div>
 
+              {/* Role Selection */}
               <div className="grid gap-2">
                 <Label className="text-[#162660] font-medium">Sign Up As</Label>
                 <div className="flex gap-4">
@@ -149,12 +203,17 @@ export function SignUpForm({
                     <span>Recruiter</span>
                   </label>
                 </div>
+                {fieldErrors.role && (
+                  <p className="text-red-500 text-sm">{fieldErrors.role}</p>
+                )}
               </div>
 
+              {/* Global Error Message */}
               {error && (
                 <p className="text-red-500 text-sm text-center">{error}</p>
               )}
 
+              {/* Submit Buttons */}
               <div className="flex flex-col gap-3">
                 <Button
                   type="submit"
@@ -172,6 +231,7 @@ export function SignUpForm({
               </div>
             </div>
 
+            {/* Login Link */}
             <div className="mt-4 text-center text-sm text-[#162660]">
               Already have an account?{" "}
               <a

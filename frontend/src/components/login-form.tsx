@@ -22,9 +22,17 @@ export function LoginForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"candidate" | "recruiter" | "">("");
+  const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+
+    // Validate role selection
+    if (!role) {
+      setError("Please select a role (Job Seeker or Recruiter)");
+      return;
+    }
 
     try {
       const response = await fetch("http://localhost:5001/api/auth/login", {
@@ -35,27 +43,36 @@ export function LoginForm({
         body: JSON.stringify({
           email,
           password,
+          role, // Include role in the login request
         }),
       });
 
       const data = await response.json();
-      console.log("Server Response:", data); // ✅ Log response
+      console.log("Server Response:", data);
 
       if (!response.ok) {
         throw new Error(data.error || "Login failed");
       }
 
+      // Explicitly set local storage with role and token
       localStorage.setItem("token", data.token);
-      localStorage.setItem("userRole", data.role);
-      router.push(data.role === "candidate" ? "/jobs" : "/post-job");
+      localStorage.setItem("userRole", role); // Use the selected role
+      
+      // Debug logging
+      console.log("Stored Token:", localStorage.getItem("token"));
+      console.log("Stored User Role:", localStorage.getItem("userRole"));
+
+      // Routing based on role
+      router.push(role === "candidate" ? "/jobs" : "/post-job");
     } catch (error) {
       console.error("Login error:", error);
+      setError(error instanceof Error ? error.message : "An unknown error occurred");
     }
   };
 
   return (
     <div
-      className={cn("flex  items-center justify-center p-6", className)}
+      className={cn("flex items-center justify-center p-6", className)}
       {...props}
     >
       <Card className="w-full max-w-md shadow-xl border border-[#162660] bg-white rounded-lg">
@@ -140,6 +157,13 @@ export function LoginForm({
                   </label>
                 </div>
               </div>
+
+              {/* Error Message */}
+              {error && (
+                <div className="text-red-500 text-sm text-center">
+                  {error}
+                </div>
+              )}
 
               {/* Buttons */}
               <div className="flex flex-col gap-3">

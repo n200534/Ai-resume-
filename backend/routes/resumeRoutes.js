@@ -1,7 +1,7 @@
 const express = require("express");
 const multer = require("multer");
 const pdfParse = require("pdf-parse");
-const { analyzeResume } = require("../services/geminiService");
+const { analyzeResumeWithGemini } = require("../services/geminiService");
 const { generateResumeReport } = require("../services/pdfgenerator");
 const Resume = require("../models/ResumeModel");
 const { authMiddleware } = require("../middlewares/authMiddleware");

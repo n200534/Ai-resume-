@@ -18,7 +18,7 @@ const analyzeResumeWithGemini = async (resumeText) => {
       {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.GEMINI_API_KEY}`,
+          Authorization: "Bearer AIzaSyBOH8_rryhUhusxWc1-0Cjl5DlawB7-T6M",
         },
       }
     );
@@ -50,7 +50,7 @@ const extractSkillsFromResume = async (resumeText) => {
         {
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.GEMINI_API_KEY}`,
+            Authorization: "Bearer AIzaSyBOH8_rryhUhusxWc1-0Cjl5DlawB7-T6M",
           },
         }
       );
