@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -234,12 +235,12 @@ export function SignUpForm({
             {/* Login Link */}
             <div className="mt-4 text-center text-sm text-[#162660]">
               Already have an account?{" "}
-              <a
-                href="/login"
+              <Link
+                href="/auth/login"
                 className="underline underline-offset-4 text-[#0f1d40] hover:text-[#162660]"
               >
                 Login
-              </a>
+              </Link>
             </div>
           </form>
         </CardContent>

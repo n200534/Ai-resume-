@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -43,7 +44,7 @@ export function LoginForm({
         body: JSON.stringify({
           email,
           password,
-          role, // Include role in the login request
+          role,
         }),
       });
 
@@ -56,7 +57,7 @@ export function LoginForm({
 
       // Explicitly set local storage with role and token
       localStorage.setItem("token", data.token);
-      localStorage.setItem("userRole", role); // Use the selected role
+      localStorage.setItem("userRole", role);
       
       // Debug logging
       console.log("Stored Token:", localStorage.getItem("token"));
@@ -112,12 +113,12 @@ export function LoginForm({
                   >
                     Password
                   </Label>
-                  <a
-                    href="#"
+                  <Link
+                    href="/forgot-password"
                     className="text-sm text-[#0f1d40] hover:text-[#162660] underline"
                   >
                     Forgot password?
-                  </a>
+                  </Link>
                 </div>
                 <Input
                   id="password"
@@ -184,12 +185,12 @@ export function LoginForm({
 
             <div className="mt-4 text-center text-sm text-[#162660]">
               Don&apos;t have an account?{" "}
-              <a
-                href="/signup"
+              <Link
+                href="/auth/signup"
                 className="underline underline-offset-4 text-[#0f1d40] hover:text-[#162660]"
               >
                 Sign up
-              </a>
+              </Link>
             </div>
           </form>
         </CardContent>
