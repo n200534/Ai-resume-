@@ -84,7 +84,7 @@ export function SignUpForm({
       localStorage.setItem("userRole", data.user.role);
 
       // Redirect based on role
-      router.push(data.user.role === "candidate" ? "/jobs" : "/post-job");
+      router.push(data.user.role === "candidate" ? "/" : "/");
     } catch (err: any) {
       setError(err.message);
     } finally {

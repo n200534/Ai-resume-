@@ -64,7 +64,7 @@ export function LoginForm({
       console.log("Stored User Role:", localStorage.getItem("userRole"));
 
       // Routing based on role
-      router.push(role === "candidate" ? "/jobs" : "/post-job");
+      router.push(role === "candidate" ? "/" : "/");
     } catch (error) {
       console.error("Login error:", error);
       setError(error instanceof Error ? error.message : "An unknown error occurred");
