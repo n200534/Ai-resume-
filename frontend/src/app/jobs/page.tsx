@@ -5,28 +5,41 @@ import { useDropzone } from "react-dropzone";
 import { UploadCloud, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+// Define interface for resume analysis
+interface ResumeAnalysis {
+  skills: string[];
+  experience: string;
+  aiFeedback: string;
+}
+
 export default function JobsPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [analysis, setAnalysis] = useState<{
-    skills: string[];
-    experience: string;
-    aiFeedback: string;
-  } | null>(null);
+  const [analysis, setAnalysis] = useState<ResumeAnalysis | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const onDrop = (acceptedFiles: File[]) => {
+    // Validate file upload
     if (acceptedFiles.length > 1) {
-      alert("You can only upload one file at a time.");
+      setError("You can only upload one file at a time.");
       return;
     }
 
     const file = acceptedFiles[0];
-    if (file.size > 10 * 1024 * 1024) {
-      alert("File size exceeds 10MB limit.");
+    
+    // Validate file type and size
+    if (file.type !== 'application/pdf') {
+      setError("Only PDF files are allowed.");
       return;
     }
 
-    setFiles([file]); // Only store one file
+    if (file.size > 10 * 1024 * 1024) {
+      setError("File size exceeds 10MB limit.");
+      return;
+    }
+
+    setFiles([file]);
+    setError(null);
   };
 
   const { getRootProps, getInputProps } = useDropzone({
@@ -37,39 +50,68 @@ export default function JobsPage() {
   });
 
   const handleAnalyze = async () => {
+    // Validate file upload before analysis
     if (files.length === 0) {
-      alert("Please upload a resume before analyzing.");
+      setError("Please upload a resume before analyzing.");
       return;
     }
 
+    // Prepare form data for upload
     const formData = new FormData();
     formData.append("resume", files[0]);
-    formData.append("name", "John Doe"); // Replace with actual user data
-    formData.append("email", "johndoe@example.com"); // Replace with actual user data
+    
+    // Note: Replace with actual user data from authentication
+    formData.append("name", "John Doe");
+    formData.append("email", "johndoe@example.com");
 
     setUploading(true);
+    setError(null);
 
     try {
-      const response = await fetch("http://localhost:5001/api/resumes/upload", {
+      // Retrieve token from local storage (ensure you have authentication)
+      const token = localStorage.getItem("token");
+      
+      // Make API call to upload and analyze resume
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/resumes/upload`, {
         method: "POST",
         body: formData,
-        credentials: "include", // Ensures authentication details are sent
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`, // If using JWT
-        },
+          'Authorization': `Bearer ${token || ''}`
+        }
       });
 
+      // Handle API response
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("Error response:", errorData);
-        throw new Error(errorData.error || "Unknown error");
+        throw new Error(errorData.error || "Unknown error occurred during resume analysis");
       }
 
       const data = await response.json();
       console.log("Resume Analysis:", data);
+
+      // Update analysis state with returned data
+      setAnalysis({
+        skills: data.resume.skills || [],
+        experience: data.resume.experience || "No experience details found",
+        aiFeedback: data.resume.aiFeedback || "No AI feedback available"
+      });
     } catch (error) {
       console.error("Error analyzing resume:", error);
+      setError(
+        error instanceof Error 
+          ? error.message 
+          : "An unexpected error occurred during resume analysis"
+      );
+    } finally {
+      setUploading(false);
     }
+  };
+
+  // Reset all states
+  const handleReset = () => {
+    setFiles([]);
+    setAnalysis(null);
+    setError(null);
   };
 
   return (
@@ -87,11 +129,18 @@ export default function JobsPage() {
         <input {...getInputProps()} />
         <UploadCloud className="w-12 h-12 text-gray-500 mb-3" />
         <p className="text-gray-600 text-lg">
-          Drag and drop your files here or{" "}
+          Drag and drop your PDF files here or{" "}
           <span className="text-[#162660] font-semibold">Browse</span>
         </p>
-        <p className="text-sm text-gray-500">Max 10MB files are allowed</p>
+        <p className="text-sm text-gray-500">Max 10MB PDF files are allowed</p>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="mt-4 p-3 w-full max-w-2xl bg-red-100 text-red-700 rounded-lg">
+          {error}
+        </div>
+      )}
 
       {/* Uploaded File */}
       {files.length > 0 && (
@@ -108,14 +157,14 @@ export default function JobsPage() {
         <Button
           variant="outline"
           className="text-[#162660] border-[#162660]"
-          onClick={() => setFiles([])}
+          onClick={handleReset}
         >
           Cancel
         </Button>
         <Button
           className="bg-[#162660] text-white hover:bg-[#111B4A]"
           onClick={handleAnalyze}
-          disabled={uploading}
+          disabled={uploading || files.length === 0}
         >
           {uploading ? "Analyzing..." : "Analyze"}
         </Button>
@@ -127,14 +176,14 @@ export default function JobsPage() {
           <h2 className="text-2xl font-semibold text-[#162660] mb-3">
             Analysis Results
           </h2>
-          <p className="text-gray-700">
+          <p className="text-gray-700 mb-2">
             <strong>AI Feedback:</strong> {analysis.aiFeedback}
           </p>
-          <p className="text-gray-700">
+          <p className="text-gray-700 mb-2">
             <strong>Experience:</strong> {analysis.experience}
           </p>
           <p className="text-gray-700">
-            <strong>Skills:</strong> {analysis.skills.join(", ")}
+            <strong>Skills:</strong> {analysis.skills.join(", ") || "No skills detected"}
           </p>
         </div>
       )}

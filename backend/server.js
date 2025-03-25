@@ -2,9 +2,11 @@ const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
 const cors = require("cors");
-const dotenv = require("dotenv");
+require("dotenv").config();
 
-dotenv.config();
+// require("@dotenvx/dotenvx").config();
+
+console.log(process.env.JWT_SECRET);
 
 const app = express();
 
@@ -34,9 +36,7 @@ app.use("/api/jobs", jobRoutes);
 
 // MongoDB Connection
 mongoose
-  .connect(
-    "mongodb+srv://amavarapuakshaykumar:akshay_321@cluster0.fxgc0.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-  )
+  .connect("mongodb+srv://amavarapuakshaykumar:akshay_321@cluster0.fxgc0.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
   .then(() => {
     app.listen(5001, () => {
       console.log("Database connected and server running at port 5001");
