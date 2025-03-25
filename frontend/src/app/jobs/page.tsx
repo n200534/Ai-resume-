@@ -91,9 +91,13 @@ export default function JobsPage() {
 
       // Update analysis state with returned data
       setAnalysis({
-        skills: data.resume.skills || [],
-        experience: data.resume.experience || "No experience details found",
-        aiFeedback: data.resume.aiFeedback || "No AI feedback available"
+        skills: data.resumeData?.skills || [],
+        experience: data.resumeData?.workExperience 
+          ? data.resumeData.workExperience
+              .map((exp: { title: any; company: any; }) => `${exp.title} at ${exp.company}`)
+              .join('; ')
+          : "No experience details found",
+        aiFeedback: "Resume analysis completed successfully"
       });
     } catch (error) {
       console.error("Error analyzing resume:", error);
@@ -106,13 +110,15 @@ export default function JobsPage() {
       setUploading(false);
     }
   };
-
   // Reset all states
   const handleReset = () => {
     setFiles([]);
     setAnalysis(null);
     setError(null);
   };
+
+
+  // Rest of the component remains the same...
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen px-4">
@@ -169,6 +175,8 @@ export default function JobsPage() {
           {uploading ? "Analyzing..." : "Analyze"}
         </Button>
       </div>
+
+
 
       {/* Analysis Results */}
       {analysis && (

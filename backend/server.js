@@ -3,8 +3,10 @@ const router = express.Router();
 const mongoose = require("mongoose");
 const cors = require("cors");
 require("dotenv").config();
+const fileUpload = require('express-fileupload');
 
-// require("@dotenvx/dotenvx").config();
+
+// require("@dotenvx/dotenvx").config();\
 
 console.log(process.env.JWT_SECRET);
 
@@ -17,6 +19,7 @@ app.use(
     credentials: true, // Allow sending cookies/auth headers
   })
 );
+app.use(fileUpload());
 
 app.use(express.json());
 

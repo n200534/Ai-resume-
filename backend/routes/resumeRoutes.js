@@ -1,151 +1,149 @@
-const express = require("express");
-const multer = require("multer");
-const fs = require("fs").promises;
-const pdfParse = require("pdf-parse");
-const { analyzeResumeWithGemini, extractSkillsFromResume } = require("../services/geminiService");
-const Resume = require("../models/ResumeModel");
-const { authMiddleware } = require("../middlewares/authMiddleware");
-
+const express = require('express');
 const router = express.Router();
+const fs = require('fs');
+const path = require('path');
+const pdf = require('pdf-parse');
 
-// Configure multer storage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    cb(null, `resume-${Date.now()}-${file.originalname}`);
-  }
-});
+function parseResumeData(text) {
+    // Remove extra whitespaces and split into lines
+    const lines = text.split('\n')
+        .map(line => line.trim())
+        .filter(line => line);
 
-// Improved file upload configuration
-const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-  },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/pdf') {
-      cb(null, true);
-    } else {
-      cb(new Error('Only PDF files are allowed'), false);
-    }
-  }
-});
-
-// Enhanced resume analysis function
-const analyzeResume = async (text) => {
-  try {
-    // Parallel processing of analysis and skill extraction
-    const [analysis, skills] = await Promise.all([
-      analyzeResumeWithGemini(text),
-      extractSkillsFromResume(text)
-    ]);
-
-    return {
-      skills: skills || analysis.skills || [],
-      experience: analysis.experience || "No experience details extracted",
-      aiFeedback: analysis.feedback || "No specific feedback available"
+    // Structured data object with default empty values
+    const resumeData = {
+        personalInfo: {
+            fullName: '',
+            firstName: '',
+            lastName: '',
+            email: '',
+            phone: '',
+            location: ''
+        },
+        workExperience: [],
+        education: {
+            degree: '',
+            major: '',
+            institution: '',
+            period: '',
+            location: ''
+        },
+        skills: [],
+        certifications: []
     };
-  } catch (error) {
-    console.error("Comprehensive resume analysis error:", error);
-    return {
-      skills: [],
-      experience: "Analysis encountered difficulties",
-      aiFeedback: "Unable to thoroughly process resume. Consider reviewing and resubmitting."
+
+    // Personal Info Extraction
+    resumeData.personalInfo = {
+        fullName: lines[0] || '',
+        firstName: lines[0]?.split(' ')[0] || '',
+        lastName: lines[0]?.split(' ').pop() || '',
+        email: lines.find(line => line.includes('@'))?.match(/[\w\.-]+@[\w\.-]+\.\w+/)?.[0] || '',
+        phone: lines.find(line => /\(\d{3}\)\s*\d{3}-\d{4}/.test(line))?.match(/\(\d{3}\)\s*\d{3}-\d{4}/)?.[0] || '',
+        location: lines.find(line => line.includes('TN') || line.includes('Nashville'))?.trim() || ''
     };
-  }
-};
 
-// Upload & Analyze Resume route
-router.post(
-  "/upload",
-  authMiddleware,
-  upload.single("resume"),
-  async (req, res) => {
-    try {
-      // Validate file upload
-      if (!req.file) {
-        return res.status(400).json({ error: "No file uploaded or invalid file type" });
-      }
+    // Work Experience Extraction
+    const workStartIndex = lines.findIndex(line => line === 'WORK EXPERIENCE');
+    const educationStartIndex = lines.findIndex(line => line === 'EDUCATION');
 
-      // Read PDF file with error handling
-      let dataBuffer;
-      try {
-        dataBuffer = await fs.readFile(req.file.path);
-      } catch (readError) {
-        console.error("File read error:", readError);
-        return res.status(500).json({ error: "Could not read uploaded file" });
-      }
-
-      // Parse PDF with timeout and error handling
-      let data;
-      try {
-        data = await pdfParse(dataBuffer);
+    if (workStartIndex !== -1 && educationStartIndex !== -1) {
+        const workLines = lines.slice(workStartIndex + 1, educationStartIndex);
         
-        // Validate extracted text
-        if (!data.text || data.text.trim() === '') {
-          return res.status(400).json({ error: "No text could be extracted from the PDF" });
+        // More robust work experience parsing
+        for (let i = 0; i < workLines.length; i += 3) {
+            if (i + 2 < workLines.length) {
+                const job = {
+                    title: workLines[i] || '',
+                    company: workLines[i + 1]?.split(/\s+(?=\d{4})/)[0] || '',
+                    period: workLines[i + 1]?.match(/\w+\s+\d{4}\s*-\s*\w+\s*\d{4}|current/)?.[0] || '',
+                    location: workLines[i + 1]?.split(/\s+/).pop() || '',
+                    responsibilities: []
+                };
+
+                // Collect responsibilities
+                let j = i + 2;
+                while (j < workLines.length && !workLines[j].match(/^[A-Z]/)) {
+                    job.responsibilities.push(workLines[j]);
+                    j++;
+                }
+
+                if (job.title && job.company) {
+                    resumeData.workExperience.push(job);
+                }
+            }
         }
-      } catch (parseError) {
-        console.error("PDF parsing error:", parseError);
-        return res.status(500).json({ error: "Failed to parse PDF content" });
-      }
+    }
 
-      // Analyze resume
-      const analysis = await analyzeResume(data.text);
+    // Education Extraction
+    const skillsStartIndex = lines.findIndex(line => line === 'SKILLS');
+    if (educationStartIndex !== -1 && skillsStartIndex !== -1) {
+        const eduLines = lines.slice(educationStartIndex + 1, skillsStartIndex);
+        resumeData.education = {
+            degree: eduLines[0] || '',
+            major: eduLines[1] || '',
+            institution: eduLines[2]?.split(/\s+(?=\d{4})/)[0] || '',
+            period: eduLines[2]?.match(/\d{4}\s*-\s*\d{4}/)?.[0] || '',
+            location: eduLines[2]?.split(/\s+/).pop() || ''
+        };
+    }
 
-      // Create new resume entry
-      const newResume = new Resume({
-        userId: req.user._id,
-        name: req.body.name || req.user.name,
-        email: req.body.email || req.user.email,
-        skills: analysis.skills,
-        experience: analysis.experience,
-        aiFeedback: analysis.aiFeedback,
-        extractedText: data.text,
-      });
+    // Skills Extraction
+    const certStartIndex = lines.findIndex(line => line === 'CERTIFICATIONS');
+    if (skillsStartIndex !== -1 && certStartIndex !== -1) {
+        resumeData.skills = lines.slice(skillsStartIndex + 1, certStartIndex);
+    }
 
-      await newResume.save();
+    // Certifications Extraction
+    if (certStartIndex !== -1) {
+        resumeData.certifications = lines.slice(certStartIndex + 1);
+    }
 
-      // Safely remove the uploaded file
-      try {
-        await fs.unlink(req.file.path);
-      } catch (unlinkError) {
-        console.warn("Could not delete temporary file:", unlinkError);
-      }
+    return resumeData;
+}
 
-      res.json({
-        message: "Resume uploaded and analyzed successfully",
-        resume: {
-          skills: newResume.skills,
-          experience: newResume.experience,
-          aiFeedback: newResume.aiFeedback
+router.post('/upload', async (req, res) => {
+    try {
+        // Check if file was uploaded
+        if (!req.files || !req.files.resume) {
+            return res.status(400).json({ error: 'No resume file uploaded' });
         }
-      });
+
+        const resumeFile = req.files.resume;
+        const uploadPath = path.join(__dirname, '../uploads', resumeFile.name);
+
+        // Ensure uploads directory exists
+        const uploadsDir = path.join(__dirname, '../uploads');
+        if (!fs.existsSync(uploadsDir)) {
+            fs.mkdirSync(uploadsDir, { recursive: true });
+        }
+
+        // Save the file
+        await resumeFile.mv(uploadPath);
+
+        // Read PDF
+        const dataBuffer = fs.readFileSync(uploadPath);
+        const pdfData = await pdf(dataBuffer);
+
+        // Parse resume data
+        const structuredResumeData = parseResumeData(pdfData.text);
+
+        // Optional: Delete the uploaded file after processing
+        fs.unlinkSync(uploadPath);
+
+        // Return structured resume data
+        res.json({
+            message: 'Resume uploaded and processed successfully',
+            resumeData: structuredResumeData,
+            rawText: pdfData.text
+        });
 
     } catch (error) {
-      console.error("Comprehensive upload error:", error);
-      res.status(500).json({ 
-        error: "Failed to upload and analyze resume",
-        details: error.message 
-      });
+        console.error('Resume upload error:', error);
+        res.status(500).json({ 
+            error: 'Failed to process resume', 
+            details: error.message 
+        });
     }
-  }
-);
-
-// Get user's resume history
-router.get("/history", authMiddleware, async (req, res) => {
-  try {
-    const resumes = await Resume.find({ userId: req.user._id })
-      .sort({ createdAt: -1 })
-      .select('skills experience aiFeedback createdAt');
-    
-    res.json(resumes);
-  } catch (error) {
-    console.error("Resume history error:", error);
-    res.status(500).json({ error: "Failed to retrieve resume history" });
-  }
 });
 
 module.exports = router;
