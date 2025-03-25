@@ -5,7 +5,9 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 
 dotenv.config();
-
+// require("dotenv").config();
+console.log("JWT:", process.env.JWT);
+process.env.JWT;
 const app = express();
 
 // Middleware

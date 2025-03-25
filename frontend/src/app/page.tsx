@@ -3,17 +3,23 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+require("dotenv").config();
 
 export default function Home() {
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userRole, setUserRole] = useState<"candidate" | "recruiter" | null>(null);
+  const [userRole, setUserRole] = useState<"candidate" | "recruiter" | null>(
+    null
+  );
 
   useEffect(() => {
     // Check authentication on client-side
     const checkAuth = () => {
       const token = localStorage.getItem("token");
-      const role = localStorage.getItem("userRole") as "candidate" | "recruiter" | null;
+      const role = localStorage.getItem("userRole") as
+        | "candidate"
+        | "recruiter"
+        | null;
 
       if (!token) {
         router.push("/auth/login");
@@ -27,11 +33,11 @@ export default function Home() {
     checkAuth();
 
     // Optional: Add event listener for storage changes
-    window.addEventListener('storage', checkAuth);
+    window.addEventListener("storage", checkAuth);
 
     // Cleanup listener
     return () => {
-      window.removeEventListener('storage', checkAuth);
+      window.removeEventListener("storage", checkAuth);
     };
   }, [router]);
 
