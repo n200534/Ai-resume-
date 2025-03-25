@@ -24,14 +24,17 @@ export function LoginForm({
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"candidate" | "recruiter" | "">("");
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setIsLoading(true);
 
     // Validate role selection
     if (!role) {
       setError("Please select a role (Job Seeker or Recruiter)");
+      setIsLoading(false);
       return;
     }
 
@@ -49,25 +52,32 @@ export function LoginForm({
       });
 
       const data = await response.json();
-      console.log("Server Response:", data);
+      console.log("Full Server Response:", data);
 
       if (!response.ok) {
-        throw new Error(data.error || "Login failed");
+        // More detailed error handling
+        const errorMessage = data.error || data.message || "Login failed";
+        setError(errorMessage);
+        console.error("Login Error Details:", data);
+        setIsLoading(false);
+        return;
       }
 
       // Explicitly set local storage with role and token
       localStorage.setItem("token", data.token);
       localStorage.setItem("userRole", role);
+      localStorage.setItem("userEmail", email);
       
       // Debug logging
-      console.log("Stored Token:", localStorage.getItem("token"));
-      console.log("Stored User Role:", localStorage.getItem("userRole"));
+      // console.log("Stored Token:", localStorage.getItem("token"));
+      // console.log("Stored User Role:", localStorage.getItem("userRole"));
 
       // Routing based on role
       router.push(role === "candidate" ? "/" : "/");
     } catch (error) {
-      console.error("Login error:", error);
-      setError(error instanceof Error ? error.message : "An unknown error occurred");
+      console.error("Network or Parsing Error:", error);
+      setError("An error occurred during login. Please try again.");
+      setIsLoading(false);
     }
   };
 
@@ -170,11 +180,13 @@ export function LoginForm({
               <div className="flex flex-col gap-3">
                 <Button
                   type="submit"
+                  disabled={isLoading}
                   className="w-full bg-[#162660] hover:bg-[#0f1d40] text-white"
                 >
-                  Login
+                  {isLoading ? "Logging in..." : "Login"}
                 </Button>
                 <Button
+                  type="button"
                   variant="outline"
                   className="w-full border-[#162660] text-[#162660] hover:bg-[#D0E6FD]"
                 >

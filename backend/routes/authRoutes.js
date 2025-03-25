@@ -85,7 +85,7 @@ router.post(
           userId: newUser._id,
           role: newUser.role,
         },
-        process.env.JWT_SECRET,
+        process.env.JWT_SECRET, // Corrected secret key usage
         { expiresIn: "7d" }
       );
 
@@ -113,20 +113,20 @@ router.post(
 // Login Route
 router.post("/login", async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, role } = req.body;
 
-    // Check if email and password are provided
-    if (!email || !password) {
+    // Check if email, password, and role are provided
+    if (!email || !password || !role) {
       return res.status(400).json({
-        error: "Email and password are required",
+        error: "Email, password, and role are required",
       });
     }
 
-    // Find user by email
-    const user = await User.findOne({ email });
+    // Find user by email and role
+    const user = await User.findOne({ email, role });
     if (!user) {
       return res.status(404).json({
-        error: "User not found",
+        error: "User not found or incorrect role",
         field: "email",
       });
     }
@@ -146,7 +146,7 @@ router.post("/login", async (req, res) => {
         userId: user._id,
         role: user.role,
       },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET, // Corrected secret key usage
       { expiresIn: "7d" }
     );
 

@@ -2,12 +2,12 @@ const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
 const cors = require("cors");
-const dotenv = require("dotenv");
+require("dotenv").config();
 
-dotenv.config();
-// require("dotenv").config();
-console.log("JWT:", process.env.JWT);
-process.env.JWT;
+// require("@dotenvx/dotenvx").config();
+
+console.log(process.env.JWT_SECRET);
+
 const app = express();
 
 // Middleware
