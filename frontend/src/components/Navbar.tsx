@@ -16,6 +16,7 @@ export default function Navbar() {
   // Hide Navbar on the login page
   if (pathname === "/login") return null;
   if (pathname === "/signup") return null;
+
   return (
     <nav className="flex items-center justify-between px-8 py-4 shadow-sm bg-white">
       {/* Left: Logo */}
