@@ -5,11 +5,11 @@ import { useDropzone } from "react-dropzone";
 import { UploadCloud, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-// Define interface for resume analysis
+// Update interface to match new API response
 interface ResumeAnalysis {
   skills: string[];
   experience: string;
-  aiFeedback: string;
+  feedback: string;
 }
 
 export default function JobsPage() {
@@ -26,9 +26,9 @@ export default function JobsPage() {
     }
 
     const file = acceptedFiles[0];
-    
+
     // Validate file type and size
-    if (file.type !== 'application/pdf') {
+    if (file.type !== "application/pdf") {
       setError("Only PDF files are allowed.");
       return;
     }
@@ -59,10 +59,6 @@ export default function JobsPage() {
     // Prepare form data for upload
     const formData = new FormData();
     formData.append("resume", files[0]);
-    
-    // Note: Replace with actual user data from authentication
-    formData.append("name", "John Doe");
-    formData.append("email", "johndoe@example.com");
 
     setUploading(true);
     setError(null);
@@ -70,20 +66,25 @@ export default function JobsPage() {
     try {
       // Retrieve token from local storage (ensure you have authentication)
       const token = localStorage.getItem("token");
-      
+
       // Make API call to upload and analyze resume
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/resumes/upload`, {
-        method: "POST",
-        body: formData,
-        headers: {
-          'Authorization': `Bearer ${token || ''}`
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/resumes/upload`,
+        {
+          method: "POST",
+          body: formData,
+          headers: {
+            Authorization: `Bearer ${token || ""}`,
+          },
         }
-      });
+      );
 
       // Handle API response
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Unknown error occurred during resume analysis");
+        throw new Error(
+          errorData.error || "Unknown error occurred during resume analysis"
+        );
       }
 
       const data = await response.json();
@@ -91,15 +92,15 @@ export default function JobsPage() {
 
       // Update analysis state with returned data
       setAnalysis({
-        skills: data.resume.skills || [],
-        experience: data.resume.experience || "No experience details found",
-        aiFeedback: data.resume.aiFeedback || "No AI feedback available"
+        skills: data.analysis?.skills || [],
+        experience: data.analysis?.experience || "No experience details found",
+        feedback: data.analysis?.feedback || "Resume analysis completed",
       });
     } catch (error) {
       console.error("Error analyzing resume:", error);
       setError(
-        error instanceof Error 
-          ? error.message 
+        error instanceof Error
+          ? error.message
           : "An unexpected error occurred during resume analysis"
       );
     } finally {
@@ -177,13 +178,14 @@ export default function JobsPage() {
             Analysis Results
           </h2>
           <p className="text-gray-700 mb-2">
-            <strong>AI Feedback:</strong> {analysis.aiFeedback}
+            <strong>AI Feedback:</strong> {analysis.feedback}
           </p>
           <p className="text-gray-700 mb-2">
             <strong>Experience:</strong> {analysis.experience}
           </p>
           <p className="text-gray-700">
-            <strong>Skills:</strong> {analysis.skills.join(", ") || "No skills detected"}
+            <strong>Skills:</strong>{" "}
+            {analysis.skills.join(", ") || "No skills detected"}
           </p>
         </div>
       )}

@@ -1,150 +1,124 @@
 const express = require("express");
-const multer = require("multer");
-const fs = require("fs").promises;
-const pdfParse = require("pdf-parse");
-const { analyzeResumeWithGemini, extractSkillsFromResume } = require("../services/geminiService");
-const Resume = require("../models/ResumeModel");
-const { authMiddleware } = require("../middlewares/authMiddleware");
-
 const router = express.Router();
+const fs = require("fs");
+const path = require("path");
+const pdf = require("pdf-parse");
+const {
+  analyzeResumeWithGemini,
+  extractSkillsFromResume,
+  calculateATSScore,
+} = require("../services/geminiService");
 
-// Configure multer storage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    cb(null, `resume-${Date.now()}-${file.originalname}`);
-  }
-});
-
-// Improved file upload configuration
-const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-  },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/pdf') {
-      cb(null, true);
-    } else {
-      cb(new Error('Only PDF files are allowed'), false);
-    }
-  }
-});
-
-// Enhanced resume analysis function
-const analyzeResume = async (text) => {
+router.post("/upload", async (req, res) => {
   try {
-    // Parallel processing of analysis and skill extraction
-    const [analysis, skills] = await Promise.all([
-      analyzeResumeWithGemini(text),
-      extractSkillsFromResume(text)
+    // Check if file was uploaded
+    if (!req.files || !req.files.resume) {
+      return res.status(400).json({ error: "No resume file uploaded" });
+    }
+
+    const resumeFile = req.files.resume;
+    const jobDescription = req.body.jobDescription || "";
+    const uploadPath = path.join(__dirname, "../uploads", resumeFile.name);
+
+    // Ensure uploads directory exists
+    const uploadsDir = path.join(__dirname, "../uploads");
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    // Save the file
+    await resumeFile.mv(uploadPath);
+
+    // Read PDF
+    const dataBuffer = fs.readFileSync(uploadPath);
+    const pdfData = await pdf(dataBuffer);
+
+    // Optional: Delete the uploaded file after processing
+    fs.unlinkSync(uploadPath);
+
+    // Perform Gemini analysis
+    const [resumeAnalysis, extractedSkills, atsScore] = await Promise.all([
+      analyzeResumeWithGemini(pdfData.text),
+      extractSkillsFromResume(pdfData.text),
+      jobDescription
+        ? calculateATSScore(pdfData.text, jobDescription)
+        : Promise.resolve(null),
     ]);
 
-    return {
-      skills: skills || analysis.skills || [],
-      experience: analysis.experience || "No experience details extracted",
-      aiFeedback: analysis.feedback || "No specific feedback available"
+    // Prepare response
+    const response = {
+      message: "Resume uploaded and processed successfully",
+      rawText: pdfData.text,
+      textLength: pdfData.text.length,
+      analysis: {
+        skills: extractedSkills,
+        experience: resumeAnalysis.experience,
+        feedback: resumeAnalysis.feedback,
+      },
     };
-  } catch (error) {
-    console.error("Comprehensive resume analysis error:", error);
-    return {
-      skills: [],
-      experience: "Analysis encountered difficulties",
-      aiFeedback: "Unable to thoroughly process resume. Consider reviewing and resubmitting."
-    };
-  }
-};
 
-// Upload & Analyze Resume route
-router.post(
-  "/upload",
-  authMiddleware,
-  upload.single("resume"),
-  async (req, res) => {
-    try {
-      // Validate file upload
-      if (!req.file) {
-        return res.status(400).json({ error: "No file uploaded or invalid file type" });
-      }
-
-      // Read PDF file with error handling
-      let dataBuffer;
-      try {
-        dataBuffer = await fs.readFile(req.file.path);
-      } catch (readError) {
-        console.error("File read error:", readError);
-        return res.status(500).json({ error: "Could not read uploaded file" });
-      }
-
-      // Parse PDF with timeout and error handling
-      let data;
-      try {
-        data = await pdfParse(dataBuffer);
-        
-        // Validate extracted text
-        if (!data.text || data.text.trim() === '') {
-          return res.status(400).json({ error: "No text could be extracted from the PDF" });
-        }
-      } catch (parseError) {
-        console.error("PDF parsing error:", parseError);
-        return res.status(500).json({ error: "Failed to parse PDF content" });
-      }
-
-      // Analyze resume
-      const analysis = await analyzeResume(data.text);
-
-      // Create new resume entry
-      const newResume = new Resume({
-        userId: req.user._id,
-        name: req.body.name || req.user.name,
-        email: req.body.email || req.user.email,
-        skills: analysis.skills,
-        experience: analysis.experience,
-        aiFeedback: analysis.aiFeedback,
-        extractedText: data.text,
-      });
-
-      await newResume.save();
-
-      // Safely remove the uploaded file
-      try {
-        await fs.unlink(req.file.path);
-      } catch (unlinkError) {
-        console.warn("Could not delete temporary file:", unlinkError);
-      }
-
-      res.json({
-        message: "Resume uploaded and analyzed successfully",
-        resume: {
-          skills: newResume.skills,
-          experience: newResume.experience,
-          aiFeedback: newResume.aiFeedback
-        }
-      });
-
-    } catch (error) {
-      console.error("Comprehensive upload error:", error);
-      res.status(500).json({ 
-        error: "Failed to upload and analyze resume",
-        details: error.message 
-      });
+    // Add ATS score if available
+    if (atsScore) {
+      response.atsAnalysis = atsScore;
     }
-  }
-);
 
-// Get user's resume history
-router.get("/history", authMiddleware, async (req, res) => {
-  try {
-    const resumes = await Resume.find({ userId: req.user._id })
-      .sort({ createdAt: -1 })
-      .select('skills experience aiFeedback createdAt');
-    
-    res.json(resumes);
+    res.json(response);
   } catch (error) {
-    console.error("Resume history error:", error);
-    res.status(500).json({ error: "Failed to retrieve resume history" });
+    console.error("Resume upload error:", error);
+    res.status(500).json({
+      error: "Failed to process resume",
+      details: error.message,
+    });
+  }
+});
+
+// New route specifically for ATS scoring
+router.post("/ats-score", async (req, res) => {
+  try {
+    // Check if resume file and job description are provided
+    if (!req.files || !req.files.resume) {
+      return res.status(400).json({ error: "No resume file uploaded" });
+    }
+
+    if (!req.body.jobDescription) {
+      return res.status(400).json({ error: "Job description is required" });
+    }
+
+    const resumeFile = req.files.resume;
+    const jobDescription = req.body.jobDescription;
+    const uploadPath = path.join(__dirname, "../uploads", resumeFile.name);
+
+    // Ensure uploads directory exists
+    const uploadsDir = path.join(__dirname, "../uploads");
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    // Save the file
+    await resumeFile.mv(uploadPath);
+
+    // Read PDF
+    const dataBuffer = fs.readFileSync(uploadPath);
+    const pdfData = await pdf(dataBuffer);
+
+    // Optional: Delete the uploaded file after processing
+    fs.unlinkSync(uploadPath);
+
+    // Calculate ATS Score
+    const atsScore = await calculateATSScore(pdfData.text, jobDescription);
+
+    res.json({
+      message: "ATS Score calculated successfully",
+      atsAnalysis: atsScore,
+      rawText: pdfData.text,
+      textLength: pdfData.text.length,
+    });
+  } catch (error) {
+    console.error("ATS Score calculation error:", error);
+    res.status(500).json({
+      error: "Failed to calculate ATS Score",
+      details: error.message,
+    });
   }
 });
 
