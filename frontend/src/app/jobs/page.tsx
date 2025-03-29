@@ -1,194 +1,262 @@
 "use client";
 
-import { useState } from "react";
-import { useDropzone } from "react-dropzone";
-import { UploadCloud, Trash2 } from "lucide-react";
+import { useState, useRef } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import Image from "next/image";
 
-// Update interface to match new API response
-interface ResumeAnalysis {
-  skills: string[];
-  experience: string;
-  feedback: string;
-}
+const jobs = [
+  {
+    id: 1,
+    name: "John Doe",
+    position: "Software Engineer",
+    description: "Expert in full-stack development.",
+    skills: ["React", "Node.js", "TypeScript"],
+    match: 90,
+  },
+  {
+    id: 2,
+    name: "Jane Smith",
+    position: "UI/UX Designer",
+    description: "Passionate about user experience.",
+    skills: ["Figma", "Adobe XD", "CSS"],
+    match: 75,
+  },
+  {
+    id: 3,
+    name: "Mike Johnson",
+    position: "Data Scientist",
+    description: "Loves working with machine learning.",
+    skills: ["Python", "TensorFlow", "SQL"],
+    match: 50,
+  },
+  {
+    id: 4,
+    name: "Sara Lee",
+    position: "DevOps Engineer",
+    description: "Experienced in cloud computing.",
+    skills: ["AWS", "Docker", "Kubernetes"],
+    match: 25,
+  },
+  {
+    id: 5,
+    name: "Alex Chen",
+    position: "Product Manager",
+    description: "Focused on user-centered solutions.",
+    skills: ["Agile", "Jira", "Product Strategy"],
+    match: 10,
+  },
+  {
+    id: 12,
+    name: "Alex Chen",
+    position: "Product Manager",
+    description: "Focused on user-centered solutions.",
+    skills: ["Agile", "Jira", "Product Strategy"],
+    match: 10,
+  },
+];
 
-export default function JobsPage() {
-  const [files, setFiles] = useState<File[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [analysis, setAnalysis] = useState<ResumeAnalysis | null>(null);
-  const [error, setError] = useState<string | null>(null);
+const recommendedJobs = [
+  {
+    id: 1,
+    name: "John Doe",
+    position: "Software Engineer",
+    description: "Expert in full-stack development.",
+    skills: ["React", "Node.js", "TypeScript"],
+    match: 90,
+  },
+  {
+    id: 6,
+    name: "Emily Wilson",
+    position: "Frontend Developer",
+    description: "Creates beautiful user interfaces.",
+    skills: ["React", "CSS", "JavaScript"],
+    match: 80,
+  },
+  {
+    id: 7,
+    name: "Daniel Lopez",
+    position: "Backend Developer",
+    description: "Builds robust server architecture.",
+    skills: ["Node.js", "MongoDB", "Express"],
+    match: 85,
+  },
+  {
+    id: 8,
+    name: "Rachel Kim",
+    position: "Full Stack Developer",
+    description: "Works across the entire tech stack.",
+    skills: ["React", "Node.js", "PostgreSQL"],
+    match: 90,
+  },
+  {
+    id: 9,
+    name: "Jason Park",
+    position: "Mobile Developer",
+    description: "Creates cross-platform applications.",
+    skills: ["React Native", "Firebase", "Redux"],
+    match: 95,
+  },
+  {
+    id: 10,
+    name: "Jason Park",
+    position: "Mobile Developer",
+    description: "Creates cross-platform applications.",
+    skills: ["React Native", "Firebase", "Redux"],
+    match: 65,
+  },
+  {
+    id: 11,
+    name: "Jason Park",
+    position: "Mobile Developer",
+    description: "Creates cross-platform applications.",
+    skills: ["React Native", "Firebase", "Redux"],
+    match: 85,
+  },
+];
 
-  const onDrop = (acceptedFiles: File[]) => {
-    // Validate file upload
-    if (acceptedFiles.length > 1) {
-      setError("You can only upload one file at a time.");
-      return;
+const getMatchColor = (match) => {
+  if (match >= 75) return "text-green-600";
+  if (match >= 30) return "text-orange-500";
+  return "text-red-500";
+};
+
+const JobCard = ({ job }) => (
+  <Card
+    key={job.id}
+    className="min-w-64 flex-shrink-0 shadow-md hover:shadow-lg transition-shadow duration-200"
+  >
+    <CardContent className="p-2">
+      <div className="flex items-center space-x-4 mb-3">
+        <div className="w-10 h-10 bg-gray-200 rounded-full flex-shrink-0 overflow-hidden">
+          <Image
+            src="/avatar-placeholder.png"
+            alt={`${job.name} avatar`}
+            width={40}
+            height={40}
+            className="object-cover"
+          />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-bold text-base text-[#162660] truncate">
+            {job.name}
+          </h3>
+          <p className="text-gray-500 text-sm truncate">{job.position}</p>
+        </div>
+      </div>
+      <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+        {job.description}
+      </p>
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {job.skills.map((skill, idx) => (
+          <span
+            key={idx}
+            className="px-2 py-0.5 bg-gray-100 rounded-full text-xs text-gray-700"
+          >
+            {skill}
+          </span>
+        ))}
+      </div>
+      <div className="flex justify-between items-center mt-auto">
+        <span className={`font-bold text-sm ${getMatchColor(job.match)}`}>
+          {job.match}% Match
+        </span>
+        <Button
+          variant="default"
+          size="sm"
+          className="bg-[#162660] hover:bg-[#0e1a45] text-white rounded-md text-xs"
+        >
+          View Job
+        </Button>
+      </div>
+    </CardContent>
+  </Card>
+);
+
+const JobsCarousel = ({ title, jobsData }) => {
+  const carouselRef = useRef(null);
+
+  const scrollLeft = () => {
+    if (carouselRef.current) {
+      carouselRef.current.scrollBy({ left: -300, behavior: "smooth" });
     }
-
-    const file = acceptedFiles[0];
-
-    // Validate file type and size
-    if (file.type !== "application/pdf") {
-      setError("Only PDF files are allowed.");
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      setError("File size exceeds 10MB limit.");
-      return;
-    }
-
-    setFiles([file]);
-    setError(null);
   };
 
-  const { getRootProps, getInputProps } = useDropzone({
-    onDrop,
-    multiple: false,
-    maxSize: 10 * 1024 * 1024,
-    accept: { "application/pdf": [".pdf"] },
-  });
-
-  const handleAnalyze = async () => {
-    // Validate file upload before analysis
-    if (files.length === 0) {
-      setError("Please upload a resume before analyzing.");
-      return;
+  const scrollRight = () => {
+    if (carouselRef.current) {
+      carouselRef.current.scrollBy({ left: 300, behavior: "smooth" });
     }
-
-    // Prepare form data for upload
-    const formData = new FormData();
-    formData.append("resume", files[0]);
-
-    setUploading(true);
-    setError(null);
-
-    try {
-      // Retrieve token from local storage (ensure you have authentication)
-      const token = localStorage.getItem("token");
-
-      // Make API call to upload and analyze resume
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/resumes/upload`,
-        {
-          method: "POST",
-          body: formData,
-          headers: {
-            Authorization: `Bearer ${token || ""}`,
-          },
-        }
-      );
-
-      // Handle API response
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.error || "Unknown error occurred during resume analysis"
-        );
-      }
-
-      const data = await response.json();
-      console.log("Resume Analysis:", data);
-
-      // Update analysis state with returned data
-      setAnalysis({
-        skills: data.analysis?.skills || [],
-        experience: data.analysis?.experience || "No experience details found",
-        feedback: data.analysis?.feedback || "Resume analysis completed",
-      });
-    } catch (error) {
-      console.error("Error analyzing resume:", error);
-      setError(
-        error instanceof Error
-          ? error.message
-          : "An unexpected error occurred during resume analysis"
-      );
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  // Reset all states
-  const handleReset = () => {
-    setFiles([]);
-    setAnalysis(null);
-    setError(null);
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen px-4">
-      {/* Title */}
-      <h1 className="text-4xl font-bold text-[#162660] mb-8 text-center">
-        Upload Your Resume and Let AI Do the Magic for You
-      </h1>
-
-      {/* Drag & Drop Box */}
-      <div
-        {...getRootProps()}
-        className="border-2 border-dashed border-gray-400 bg-white rounded-lg w-full max-w-2xl h-56 p-8 flex flex-col items-center justify-center cursor-pointer hover:border-[#162660] transition"
-      >
-        <input {...getInputProps()} />
-        <UploadCloud className="w-12 h-12 text-gray-500 mb-3" />
-        <p className="text-gray-600 text-lg">
-          Drag and drop your PDF files here or{" "}
-          <span className="text-[#162660] font-semibold">Browse</span>
-        </p>
-        <p className="text-sm text-gray-500">Max 10MB PDF files are allowed</p>
+    <div className="mb-10 relative">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold text-[#162660]">{title}</h2>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="icon"
+            className="w-8 h-8 rounded-full border border-gray-200"
+            onClick={scrollLeft}
+          >
+            <ChevronLeft size={18} />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            className="w-8 h-8 rounded-full border border-gray-200"
+            onClick={scrollRight}
+          >
+            <ChevronRight size={18} />
+          </Button>
+          <Button variant="link" className="text-[#162660] font-medium">
+            View All
+          </Button>
+        </div>
       </div>
 
-      {/* Error Message */}
-      {error && (
-        <div className="mt-4 p-3 w-full max-w-2xl bg-red-100 text-red-700 rounded-lg">
-          {error}
-        </div>
-      )}
-
-      {/* Uploaded File */}
-      {files.length > 0 && (
-        <div className="mt-4 p-3 w-full max-w-2xl bg-white rounded-lg shadow-md flex items-center justify-between">
-          <span className="text-gray-700">{files[0].name}</span>
-          <button onClick={() => setFiles([])}>
-            <Trash2 className="w-5 h-5 text-gray-500 hover:text-red-600" />
-          </button>
-        </div>
-      )}
-
-      {/* Action Buttons */}
-      <div className="mt-6 flex gap-4">
-        <Button
-          variant="outline"
-          className="text-[#162660] border-[#162660]"
-          onClick={handleReset}
+      <div className="relative">
+        <div
+          ref={carouselRef}
+          className="flex space-x-4 overflow-x-auto pb-4 scrollbar-hide"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
-          Cancel
-        </Button>
-        <Button
-          className="bg-[#162660] text-white hover:bg-[#111B4A]"
-          onClick={handleAnalyze}
-          disabled={uploading || files.length === 0}
-        >
-          {uploading ? "Analyzing..." : "Analyze"}
-        </Button>
+          {jobsData.map((job) => (
+            <JobCard key={job.id} job={job} />
+          ))}
+        </div>
       </div>
+    </div>
+  );
+};
 
-      {/* Analysis Results */}
-      {analysis && (
-        <div className="mt-8 p-6 w-full max-w-2xl bg-[#F0F4FF] rounded-lg shadow-md">
-          <h2 className="text-2xl font-semibold text-[#162660] mb-3">
-            Analysis Results
-          </h2>
-          <p className="text-gray-700 mb-2">
-            <strong>AI Feedback:</strong> {analysis.feedback}
-          </p>
-          <p className="text-gray-700 mb-2">
-            <strong>Experience:</strong> {analysis.experience}
-          </p>
-          <p className="text-gray-700">
-            <strong>Skills:</strong>{" "}
-            {analysis.skills.join(", ") || "No skills detected"}
-          </p>
+export default function JobsPage() {
+  const [search, setSearch] = useState("");
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-screen mx-auto px-4 py-6">
+        <div className="relative mb-8 flex justify-center">
+          <div className="relative w-full max-w-md">
+            <input
+              type="text"
+              placeholder="Search All Jobs"
+              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#162660] focus:border-transparent"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-5 w-5 text-gray-400" />
+            </div>
+          </div>
         </div>
-      )}
+
+        <main>
+          <JobsCarousel title="Recommended Jobs" jobsData={recommendedJobs} />
+          <JobsCarousel title="All Jobs" jobsData={jobs} />
+        </main>
+      </div>
     </div>
   );
 }
