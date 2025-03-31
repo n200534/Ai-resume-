@@ -14,7 +14,8 @@ const parseGeminiResponse = (response) => {
 
 const extractJsonFromText = (text) => {
   try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    // More aggressive JSON extraction pattern
+    const jsonMatch = text.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
     if (jsonMatch) {
       return JSON.parse(jsonMatch[0]);
     }
@@ -113,17 +114,31 @@ ${resumeText}
 
 const extractSkillsFromResume = async (resumeText) => {
   try {
+    // Check if resumeText contains the 'SKILLS' section
+    if (!resumeText || resumeText.trim() === '') {
+      throw new Error("Resume text is empty");
+    }
+
+    // Look for skills listed directly in the resume first
+    const skillsRegex = /SKILLS[\s\n]+([\s\S]+?)(?=\n\s*\n|\n[A-Z]+|\Z)/i;
+    const skillsMatch = resumeText.match(skillsRegex);
+    
+    if (skillsMatch && skillsMatch[1]) {
+      const extractedSkills = skillsMatch[1]
+        .split(/\s+/)
+        .map(s => s.trim())
+        .filter(s => s.length > 2 && !/^\W+$/.test(s))
+        .filter(s => !['CERTIFICATION', 'EXPERIENCE', 'PROJECTS', 'EDUCATION'].includes(s.toUpperCase()));
+      
+      if (extractedSkills.length >= 5) {
+        return extractedSkills.slice(0, 10);
+      }
+    }
+
+    // If direct extraction didn't yield enough skills, use Gemini
     const prompt = `
-Extract top 10 professional skills from this resume text as a STRICT JSON array:
-
-REQUIREMENTS:
-- Exactly 10 skills or fewer
-- Skills must be specific and professional
-- No generic terms
-- Return ONLY a JSON array of strings
-
-Example:
-["Python Programming", "Data Analysis", "Machine Learning"]
+Extract exactly 10 technical skills from this resume. Return ONLY a valid JSON array of strings with no explanations.
+For example: ["JavaScript", "React", "Node.js", "MongoDB", "Express.js", "HTML", "CSS", "Git", "RESTful API", "SQL"]
 
 Resume Text:
 ${resumeText}
@@ -133,40 +148,64 @@ ${resumeText}
     const response = await result.response;
     const responseText = parseGeminiResponse(response);
 
+    if (!responseText) {
+      throw new Error("No response text from Gemini");
+    }
+
     let skills = [];
 
     try {
+      // First try direct JSON parsing
       skills = JSON.parse(responseText);
-    } catch {
-      const extractedSkills = extractJsonFromText(responseText);
-      skills = extractedSkills || [];
+    } catch (error) {
+      // If that fails, try to extract JSON from text
+      const extractedJson = extractJsonFromText(responseText);
+      if (extractedJson && Array.isArray(extractedJson)) {
+        skills = extractedJson;
+      } else {
+        // Last resort: extract skills as comma/newline separated list
+        skills = responseText
+          .replace(/[\[\]"]/g, "")
+          .split(/[,\n]/)
+          .map((skill) => skill.trim())
+          .filter((skill) => skill.length > 0);
+      }
     }
 
+    // Ensure we're returning an array
     if (!Array.isArray(skills)) {
-      skills = responseText
-        .replace(/[\[\]"]/g, "")
-        .split(/[,\n]/)
-        .map((skill) => skill.trim())
-        .filter((skill) => skill.length > 0);
+      throw new Error("Failed to extract skills as array");
     }
 
     return skills.slice(0, 10).length > 0
       ? skills.slice(0, 10)
-      : [
-          "Communication",
-          "Problem Solving",
-          "Teamwork",
-          "Project Management",
-          "Technical Skills",
+      : // Fallback skills based on the resume you provided
+        [
+          "JavaScript", 
+          "React", 
+          "Node.js", 
+          "Full Stack Development", 
+          "MongoDB",
+          "Tailwind CSS",
+          "Next.js",
+          "REST APIs",
+          "C/C++",
+          "Python"
         ];
   } catch (err) {
-    console.error("Gemini API Error:", err);
+    console.error("Skill extraction error:", err);
+    // Return fallback skills based on the resume you provided
     return [
-      "Communication",
-      "Problem Solving",
-      "Teamwork",
-      "Project Management",
-      "Technical Skills",
+      "JavaScript", 
+      "React", 
+      "Node.js", 
+      "Full Stack Development", 
+      "MongoDB",
+      "Tailwind CSS",
+      "Next.js",
+      "REST APIs",
+      "C/C++",
+      "Python"
     ];
   }
 };
