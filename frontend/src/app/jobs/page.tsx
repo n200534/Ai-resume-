@@ -1,78 +1,143 @@
-// components/JobsPage.jsx
-
 "use client";
 
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Search, Filter } from "lucide-react";
-import Image from "next/image";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  Filter,
+  Briefcase,
+  Upload,
+  AlertCircle,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
 
 const getMatchColor = (match) => {
+  if (!match && match !== 0) return "text-gray-500";
   if (match >= 75) return "text-green-600";
   if (match >= 30) return "text-orange-500";
   return "text-red-500";
 };
 
-const JobCard = ({ job, onViewJob }) => (
-  <Card
-    key={job.id || job._id}
-    className="min-w-64 flex-shrink-0 shadow-md hover:shadow-lg transition-shadow duration-200"
-  >
-    <CardContent className="p-2">
-      <div className="flex items-center space-x-4 mb-3">
-        <div className="w-10 h-10 bg-gray-200 rounded-full flex-shrink-0 overflow-hidden">
-          <Image
-            src="/avatar-placeholder.png"
-            alt={`${job.company || job.name} avatar`}
-            width={40}
-            height={40}
-            className="object-cover"
-          />
-        </div>
-        <div className="flex-1 min-w-0">
+const JobCard = ({ job, onViewJob }) => {
+  // Safely extract top 3 skills only
+  const topSkills = Array.isArray(job.skills) ? job.skills.slice(0, 3) : [];
+
+  // Handle salary display safely
+  const formatSalary = (salary) => {
+    if (!salary) return null;
+
+    // If salary is an object with currency property, handle it
+    if (typeof salary === "object" && salary.currency) {
+      const currencySymbol = salary.currency === "USD" ? "$" : salary.currency;
+      return `${currencySymbol}${
+        salary.amount ? salary.amount.toLocaleString() : ""
+      }`;
+    }
+
+    // Otherwise treat as number or string
+    return `$${typeof salary === "number" ? salary.toLocaleString() : salary}`;
+  };
+
+  return (
+    <Card className="w-80 h-80 shadow-md hover:shadow-lg transition-shadow duration-200 border-l-4 border-l-[#162660]">
+      <CardContent className="p-4 flex flex-col h-full">
+        {/* Header section with fixed height */}
+        <div className="flex flex-col mb-3 h-20">
           <h3 className="font-bold text-base text-[#162660] truncate">
-            {job.company || job.name}
+            {job.title || job.position || "Untitled Position"}
           </h3>
-          <p className="text-gray-500 text-sm truncate">{job.title || job.position}</p>
+          <p className="text-gray-700 font-medium text-sm truncate">
+            {job.company ||
+              (job.postedBy && job.postedBy.company) ||
+              "Unknown Company"}
+          </p>
+          <p className="text-gray-500 text-xs">
+            {job.location || "Location not specified"}
+          </p>
+        </div>
+
+        {/* Description with fixed height */}
+        <div className="h-16 mb-3">
+          <p className="text-gray-600 text-sm line-clamp-2 overflow-hidden">
+            {job.description || "No description available"}
+          </p>
+        </div>
+
+        {/* Salary section with fixed height */}
+        <div className="h-6 mb-2">
+          {job.salary && (
+            <p className="text-gray-700 text-sm font-medium">
+              {formatSalary(job.salary)}
+            </p>
+          )}
+        </div>
+
+        {/* Skills section with fixed height */}
+        <div className="flex flex-wrap gap-1.5 mb-3 h-10 overflow-hidden">
+          {topSkills.map((skill, idx) => (
+            <span
+              key={`skill-${idx}`}
+              className="px-2 py-1 bg-[#eef1f8] rounded-full text-xs text-[#162660] font-medium"
+            >
+              {skill}
+            </span>
+          ))}
+          {job.skills && job.skills.length > 3 && (
+            <span className="px-2 py-1 bg-gray-100 rounded-full text-xs text-gray-500">
+              +{job.skills.length - 3} more
+            </span>
+          )}
+        </div>
+
+        {/* Button section - auto at bottom */}
+        <div className="flex justify-center items-center mt-auto pt-2 border-t border-gray-100">
+          <Button
+            variant="default"
+            size="sm"
+            className="bg-[#162660] hover:bg-[#0e1a45] text-white rounded-md text-xs"
+            onClick={() => onViewJob(job)}
+          >
+            View Job
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+const ResumeUploadPrompt = ({ onNavigate }) => (
+  <div className="bg-[#f0f4ff] border border-[#d0d9f5] rounded-lg p-4 mb-8">
+    <div className="flex items-start">
+      <div className="flex-shrink-0 pt-0.5">
+        <AlertCircle className="h-5 w-5 text-[#162660]" />
+      </div>
+      <div className="ml-3">
+        <h3 className="text-sm font-medium text-[#162660]">Resume Required</h3>
+        <div className="mt-2 text-sm text-gray-700">
+          <p>
+            Upload your resume to start getting personalized job
+            recommendations.
+          </p>
+        </div>
+        <div className="mt-4">
+          <Button
+            size="sm"
+            className="bg-[#162660] hover:bg-[#0e1a45] text-white inline-flex items-center"
+            onClick={onNavigate}
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Upload Resume
+          </Button>
         </div>
       </div>
-      <p className="text-gray-600 text-sm mb-2 line-clamp-2">
-        {job.description}
-      </p>
-      {job.salary && (
-        <p className="text-gray-700 text-sm font-medium mb-2">
-          ${typeof job.salary === 'number' ? job.salary.toLocaleString() : job.salary}
-        </p>
-      )}
-      <div className="flex flex-wrap gap-1.5 mb-3">
-        {(job.skills || []).map((skill, idx) => (
-          <span
-            key={`${job.id || job._id}-skill-${idx}`}
-            className="px-2 py-0.5 bg-gray-100 rounded-full text-xs text-gray-700"
-          >
-            {skill}
-          </span>
-        ))}
-      </div>
-      <div className="flex justify-between items-center mt-auto">
-        <span className={`font-bold text-sm ${getMatchColor(job.matchScore || job.match)}`}>
-          {job.matchScore || job.match}% Match
-        </span>
-        <Button
-          variant="default"
-          size="sm"
-          className="bg-[#162660] hover:bg-[#0e1a45] text-white rounded-md text-xs"
-          onClick={() => onViewJob(job)}
-        >
-          View Job
-        </Button>
-      </div>
-    </CardContent>
-  </Card>
+    </div>
+  </div>
 );
 
-const JobsCarousel = ({ title, jobsData, onViewJob, loading }) => {
+const JobsCarousel = ({ title, jobsData, onViewJob, loading, onViewAll }) => {
   const carouselRef = useRef(null);
 
   const scrollLeft = () => {
@@ -110,10 +175,11 @@ const JobsCarousel = ({ title, jobsData, onViewJob, loading }) => {
           >
             <ChevronRight size={18} />
           </Button>
-          <Button 
-            variant="link" 
+          <Button
+            variant="link"
             className="text-[#162660] font-medium"
             disabled={loading}
+            onClick={onViewAll}
           >
             View All
           </Button>
@@ -123,7 +189,10 @@ const JobsCarousel = ({ title, jobsData, onViewJob, loading }) => {
       <div className="relative">
         {loading ? (
           <div className="py-8 text-center">
-            <p className="text-gray-500">Loading jobs...</p>
+            <div className="flex justify-center items-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#162660]"></div>
+            </div>
+            <p className="text-gray-500 mt-2">Loading jobs...</p>
           </div>
         ) : (
           <div
@@ -133,14 +202,19 @@ const JobsCarousel = ({ title, jobsData, onViewJob, loading }) => {
           >
             {jobsData && jobsData.length > 0 ? (
               jobsData.map((job) => (
-                <JobCard 
-                  key={job.id || job._id} 
-                  job={job} 
-                  onViewJob={onViewJob} 
+                <JobCard
+                  key={
+                    job._id || `job-${Math.random().toString(36).substr(2, 9)}`
+                  }
+                  job={job}
+                  onViewJob={onViewJob}
                 />
               ))
             ) : (
-              <p className="text-gray-500 py-4">No jobs found.</p>
+              <div className="flex flex-col items-center justify-center w-full py-10 bg-gray-50 rounded-lg">
+                <Briefcase className="h-12 w-12 text-gray-300 mb-2" />
+                <p className="text-gray-500">No jobs found.</p>
+              </div>
             )}
           </div>
         )}
@@ -150,6 +224,7 @@ const JobsCarousel = ({ title, jobsData, onViewJob, loading }) => {
 };
 
 export default function JobsPage() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [allJobs, setAllJobs] = useState([]);
   const [recommendedJobs, setRecommendedJobs] = useState([]);
@@ -158,29 +233,133 @@ export default function JobsPage() {
   const [filters, setFilters] = useState({
     skills: [],
     location: "",
-    experience: null
+    experience: null,
+    type: "",
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [resumeNotFound, setResumeNotFound] = useState(false);
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
 
   useEffect(() => {
+    // Check authentication status
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    setIsAuthenticated(!!token);
+
     // Fetch jobs when component mounts
     fetchJobs();
-    fetchRecommendedJobs();
+
+    // Only fetch recommended jobs if authenticated
+    if (token) {
+      fetchRecommendedJobs();
+    } else {
+      setRecommendedLoading(false);
+    }
   }, []);
+
+  // Client-side filtering function to handle case-insensitive matching
+  const performClientSideFiltering = (jobs) => {
+    if (!jobs || !Array.isArray(jobs)) return [];
+
+    // Apply filters
+    return jobs.filter((job) => {
+      // Filter by search term
+      if (search && search.trim() !== "") {
+        const searchTerm = search.toLowerCase();
+
+        // Search in title
+        const titleMatches =
+          job.title && job.title.toLowerCase().includes(searchTerm);
+
+        // Search in company
+        const companyMatches =
+          job.company && job.company.toLowerCase().includes(searchTerm);
+
+        // Search in skills
+        const skillsMatch =
+          Array.isArray(job.skills) &&
+          job.skills.some((skill) => skill.toLowerCase().includes(searchTerm));
+
+        // Search in description
+        const descriptionMatches =
+          job.description && job.description.toLowerCase().includes(searchTerm);
+
+        // If none of the fields match, filter out this job
+        if (
+          !(titleMatches || companyMatches || skillsMatch || descriptionMatches)
+        ) {
+          return false;
+        }
+      }
+
+      // Filter by skills
+      if (
+        filters.skills &&
+        filters.skills.length > 0 &&
+        filters.skills[0] !== ""
+      ) {
+        // Check if all required skills are present
+        const hasAllSkills = filters.skills.every((requiredSkill) => {
+          if (!job.skills || !Array.isArray(job.skills)) return false;
+          return job.skills.some(
+            (skill) => skill.toLowerCase() === requiredSkill.toLowerCase()
+          );
+        });
+
+        if (!hasAllSkills) return false;
+      }
+
+      // Filter by location
+      if (filters.location && filters.location.trim() !== "") {
+        if (
+          !job.location ||
+          !job.location.toLowerCase().includes(filters.location.toLowerCase())
+        ) {
+          return false;
+        }
+      }
+
+      // Filter by experience
+      if (filters.experience) {
+        // This assumes job.experience is a number
+        if (!job.experience || job.experience < filters.experience) {
+          return false;
+        }
+      }
+
+      // Filter by job type
+      if (filters.type && filters.type.trim() !== "") {
+        if (
+          !job.type ||
+          !job.type.toLowerCase().includes(filters.type.toLowerCase())
+        ) {
+          return false;
+        }
+      }
+
+      // If all filters pass, include this job
+      return true;
+    });
+  };
 
   const fetchJobs = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:5001/api/jobs');
-      
+
+      // Make a simpler API call to get ALL jobs - we'll filter client-side
+      const response = await fetch(`${API_URL}/api/jobs`);
+
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
+
       if (data.jobs && Array.isArray(data.jobs)) {
-        setAllJobs(data.jobs);
+        // Apply client-side filtering to handle case-insensitivity
+        const filteredJobs = performClientSideFiltering(data.jobs);
+        setAllJobs(filteredJobs);
       } else {
         console.error("Invalid jobs data format:", data);
         setAllJobs([]);
@@ -196,43 +375,46 @@ export default function JobsPage() {
   const fetchRecommendedJobs = async () => {
     try {
       setRecommendedLoading(true);
+      setResumeNotFound(false);
+
       // Check if localStorage is available (client-side only)
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-      
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
+
       if (!token) {
-        console.log("No authentication token found, cannot fetch recommended jobs");
+        console.log(
+          "No authentication token found, cannot fetch recommended jobs"
+        );
         setRecommendedJobs([]);
         setRecommendedLoading(false);
         return;
       }
-      
-      const response = await fetch('http://localhost:5001/api/jobs/recommended', {
+
+      const response = await fetch(`${API_URL}/api/jobs/recommended`, {
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
-      
+
       if (!response.ok) {
         if (response.status === 401) {
           console.log("Authentication failed for recommended jobs");
+        } else if (response.status === 404) {
+          console.log("Resume not found for job recommendations");
+          setResumeNotFound(true);
         } else {
-          console.error(`Error response: ${response.status}`);
+          console.log(`Error response status: ${response.status}`);
         }
         setRecommendedJobs([]);
         return;
       }
-      
+
       const data = await response.json();
-      
-      if (data.matchedJobs && Array.isArray(data.matchedJobs)) {
-        // Sort by match score and take top matches
-        const topMatches = [...data.matchedJobs]
-          .sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0))
-          .slice(0, 10);
-          
-        setRecommendedJobs(topMatches);
+
+      if (data.recommendedJobs && Array.isArray(data.recommendedJobs)) {
+        setRecommendedJobs(data.recommendedJobs);
       } else {
-        console.error("Invalid matched jobs data format:", data);
+        console.error("Invalid recommended jobs data format:", data);
         setRecommendedJobs([]);
       }
     } catch (error) {
@@ -243,109 +425,184 @@ export default function JobsPage() {
     }
   };
 
-  const handleSearch = async () => {
-    try {
-      setLoading(true);
-      
-      // Build query string from search and filters
-      let queryParams = [];
-      
-      if (search) {
-        queryParams.push(`search=${encodeURIComponent(search)}`);
-      }
-      
-      if (filters.skills && filters.skills.length > 0) {
-        queryParams.push(`skills=${encodeURIComponent(filters.skills.join(','))}`);
-      }
-      
-      if (filters.location) {
-        queryParams.push(`location=${encodeURIComponent(filters.location)}`);
-      }
-      
-      if (filters.experience) {
-        queryParams.push(`experience=${encodeURIComponent(filters.experience)}`);
-      }
-      
-      const url = `/api/jobs${queryParams.length > 0 ? `?${queryParams.join('&')}` : ''}`;
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.jobs && Array.isArray(data.jobs)) {
-        setAllJobs(data.jobs);
-      } else {
-        console.error("Invalid jobs data format:", data);
-        setAllJobs([]);
-      }
-    } catch (error) {
-      console.error("Error searching jobs:", error);
-      setAllJobs([]);
-    } finally {
-      setLoading(false);
-    }
+  const handleSearch = () => {
+    fetchJobs();
   };
 
   const handleViewJob = (job) => {
     // Navigate to job details page
-    const jobId = job.id || job._id;
+    const jobId = job._id;
     if (jobId) {
-      window.location.href = `/jobs/${jobId}`;
+      router.push(`/jobs/${jobId}`);
     } else {
       console.error("Cannot navigate to job details: Missing job ID", job);
     }
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       handleSearch();
     }
   };
 
+  const handleApplyFilters = () => {
+    setShowFilters(false);
+    fetchJobs();
+  };
+
+  const handleViewAllJobs = () => {
+    router.push("/jobs/all");
+  };
+
+  const handleViewAllRecommended = () => {
+    router.push("/jobs/recommended");
+  };
+
+  const navigateToResumeUpload = () => {
+    router.push("/profile/resume");
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-screen mx-auto px-4 py-6">
+      <div className="max-w-screen-xl mx-auto px-4 py-6">
         <div className="relative mb-8 flex justify-center">
           <div className="relative w-full max-w-md">
-            <input
-              type="text"
-              placeholder="Search All Jobs"
-              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#162660] focus:border-transparent"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyPress={handleKeyPress}
-              disabled={loading}
-            />
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-5 w-5 text-gray-400" />
+            <div className="relative flex items-center">
+              <Search className="absolute left-3 h-5 w-5 text-gray-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search Jobs by Title, Skills, or Company"
+                className="w-full pl-10 pr-14 py-2 bg-white border border-gray-200 rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-[#162660] focus:border-transparent"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyPress={handleKeyPress}
+                disabled={loading}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                className="absolute right-1 h-8 px-3 text-sm rounded-full border-0"
+                onClick={handleSearch}
+                disabled={loading}
+              >
+                Search
+              </Button>
             </div>
-            <Button 
-              variant="outline"
-              size="sm"
-              className="absolute inset-y-0 right-0 px-3 flex items-center"
-              onClick={handleSearch}
-              disabled={loading}
-            >
-              Search
-            </Button>
           </div>
+          <Button
+            variant="outline"
+            size="icon"
+            className="ml-2 w-10 h-10 rounded-full border border-gray-200"
+            onClick={() => setShowFilters(!showFilters)}
+            disabled={loading}
+          >
+            <Filter className="h-5 w-5 text-gray-600" />
+          </Button>
         </div>
 
+        {showFilters && (
+          <div className="bg-white rounded-lg shadow p-4 mb-6">
+            <h3 className="text-lg font-medium mb-3">Filter Jobs</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Skills
+                </label>
+                <input
+                  type="text"
+                  className="w-full p-2 border border-gray-300 rounded-md"
+                  placeholder="e.g. JavaScript, React"
+                  value={filters.skills.join(", ")}
+                  onChange={(e) =>
+                    setFilters({
+                      ...filters,
+                      skills: e.target.value.split(",").map((s) => s.trim()),
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Location
+                </label>
+                <input
+                  type="text"
+                  className="w-full p-2 border border-gray-300 rounded-md"
+                  placeholder="e.g. New York, Remote"
+                  value={filters.location}
+                  onChange={(e) =>
+                    setFilters({ ...filters, location: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Experience (years)
+                </label>
+                <input
+                  type="number"
+                  className="w-full p-2 border border-gray-300 rounded-md"
+                  placeholder="e.g. 3"
+                  value={filters.experience || ""}
+                  onChange={(e) =>
+                    setFilters({
+                      ...filters,
+                      experience: e.target.value
+                        ? Number(e.target.value)
+                        : null,
+                    })
+                  }
+                />
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Button
+                variant="outline"
+                className="mr-2"
+                onClick={() => {
+                  setFilters({
+                    skills: [],
+                    location: "",
+                    experience: null,
+                    type: "",
+                  });
+                  setShowFilters(false);
+                  fetchJobs();
+                }}
+              >
+                Reset
+              </Button>
+              <Button
+                className="bg-[#162660] hover:bg-[#0e1a45]"
+                onClick={handleApplyFilters}
+              >
+                Apply Filters
+              </Button>
+            </div>
+          </div>
+        )}
+
         <main>
-          <JobsCarousel 
-            title="Recommended Jobs" 
-            jobsData={recommendedJobs} 
-            onViewJob={handleViewJob} 
-            loading={recommendedLoading}
-          />
-          <JobsCarousel 
-            title="All Jobs" 
-            jobsData={allJobs} 
-            onViewJob={handleViewJob} 
+          {isAuthenticated && resumeNotFound && (
+            <ResumeUploadPrompt onNavigate={navigateToResumeUpload} />
+          )}
+
+          {isAuthenticated && !resumeNotFound && (
+            <JobsCarousel
+              title="Recommended Jobs"
+              jobsData={recommendedJobs}
+              onViewJob={handleViewJob}
+              loading={recommendedLoading}
+              onViewAll={handleViewAllRecommended}
+            />
+          )}
+
+          <JobsCarousel
+            title="All Jobs"
+            jobsData={allJobs}
+            onViewJob={handleViewJob}
             loading={loading}
+            onViewAll={handleViewAllJobs}
           />
         </main>
       </div>
