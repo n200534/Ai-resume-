@@ -2,16 +2,45 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 export default function Navbar() {
+  const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const pathname = usePathname();
   const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
-    const role = localStorage.getItem("userRole"); // Retrieve role from localStorage
-    setUserRole(role);
-  }, []);
+    // Check authentication on client-side
+    const checkAuth = () => {
+      const token = localStorage.getItem("token");
+      const role = localStorage.getItem("userRole") as
+        | "candidate"
+        | "recruiter"
+        | null;
+
+      if (!token) {
+        router.push("/auth/login");
+      } else {
+        setIsAuthenticated(true);
+        setUserRole(role);
+      }
+    };
+
+    // Run initial check
+    checkAuth();
+
+    // Optional: Add event listener for storage changes
+    window.addEventListener("storage", checkAuth);
+
+    // Cleanup listener
+    return () => {
+      window.removeEventListener("storage", checkAuth);
+    };
+  }, [router]);
+
+  if (!isAuthenticated || !userRole) return null; // Prevent flicker
 
   // Hide Navbar on the login page
   if (pathname === "/auth/login") return null;
@@ -20,7 +49,7 @@ export default function Navbar() {
     <nav className="flex items-center justify-between px-8 py-4 shadow-sm bg-white">
       {/* Left: Logo */}
       <div className="text-xl font-bold flex items-center space-x-2">
-        <span className="text-blue-700">🤖</span>{" "}
+        <span className="text-blue-700"></span>{" "}
         {/* Replace with an actual logo */}
         <span className="text-[#1E2A41] font-semibold">JobFit AI</span>
       </div>
@@ -44,7 +73,7 @@ export default function Navbar() {
                 pathname === "/post-job" ? "text-[#162660] font-semibold" : ""
               }`}
             >
-              Post a Job
+              Post Job
             </Link>
             <Link
               href="/job-seekers"
