@@ -58,12 +58,20 @@ const mockCandidates = [
 
 export default function RecruiterJobPostPage() {
   const [formData, setFormData] = useState({
-    position: "",
-    jobDescription: "",
-    requiredSkills: "",
+    title: "",
+    company: "",
+    description: "",
+    skills: "",
+    location: "",
+    salary: "",
+    requiredExperience: "",
+    employmentType: "Full-time", // Updated to match schema enum
+    expiryDate: ""
   });
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [jobPosted, setJobPosted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
 
   // Handle form input changes
   const handleInputChange = (
@@ -79,25 +87,112 @@ export default function RecruiterJobPostPage() {
   };
 
   // Handle job posting
-  const handlePostJob = () => {
+  const handlePostJob = async () => {
+    // Reset error state
+    setError("");
+    
     // Basic validation
     if (
-      !formData.position ||
-      !formData.jobDescription ||
-      !formData.requiredSkills
+      !formData.title ||
+      !formData.company ||
+      !formData.description ||
+      !formData.skills ||
+      !formData.location
     ) {
-      alert("Please fill all fields");
+      setError("Please fill all required fields");
       return;
     }
 
-    // Simulate job posting
-    setShowSuccessPopup(true);
-    setJobPosted(true);
+    try {
+      setIsLoading(true);
+      
+      // Get the authentication token from localStorage
+      const token = localStorage.getItem('token'); 
+      
+      if (!token) {
+        throw new Error("Authentication token not found. Please log in again.");
+      }
+      
+      // Parse skills into an array
+      const skillsArray = formData.skills.split(',').map(skill => skill.trim());
+      
+      // Parse required experience to a number
+      let experienceNumber = 0;
+      if (formData.requiredExperience) {
+        const match = formData.requiredExperience.match(/\d+/);
+        if (match) {
+          experienceNumber = parseInt(match[0], 10);
+        }
+      }
+      
+      // Parse salary if provided
+      let salary = {};
+      if (formData.salary) {
+        const salaryMatch = formData.salary.match(/\$?([\d,]+)\s*-\s*\$?([\d,]+)/);
+        if (salaryMatch) {
+          salary = {
+            min: parseInt(salaryMatch[1].replace(/,/g, ''), 10),
+            max: parseInt(salaryMatch[2].replace(/,/g, ''), 10),
+            currency: 'USD'
+          };
+        }
+      }
+      
+      // Create the payload to match backend schema
+      const jobPayload = {
+        title: formData.title,
+        company: formData.company,
+        description: formData.description,
+        skills: skillsArray,
+        location: formData.location,
+        salary: Object.keys(salary).length > 0 ? salary : undefined,
+        requiredExperience: experienceNumber,
+        employmentType: formData.employmentType,
+        expiryDate: formData.expiryDate || undefined
+      };
+      
+      // Call the API endpoint
+      const response = await fetch("http://localhost:5001/api/jobs/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(jobPayload),
+      });
 
-    // Automatically hide popup after 3 seconds
-    setTimeout(() => {
-      setShowSuccessPopup(false);
-    }, 3000);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to post job");
+      }
+
+      // Show success popup
+      setShowSuccessPopup(true);
+      setJobPosted(true);
+
+      // Reset form data
+      setFormData({
+        title: "",
+        company: "",
+        description: "",
+        skills: "",
+        location: "",
+        salary: "",
+        requiredExperience: "",
+        employmentType: "Full-time",
+        expiryDate: ""
+      });
+
+      // Automatically hide popup after 3 seconds
+      setTimeout(() => {
+        setShowSuccessPopup(false);
+      }, 3000);
+    } catch (err) {
+      setError(err.message || "An error occurred while posting the job");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Close popup when clicking outside
@@ -123,15 +218,21 @@ export default function RecruiterJobPostPage() {
           Post a New Job
         </h1>
 
-        <div className="grid md:grid-cols-3 gap-6 bg-white border border-gray-200 rounded-xl p-8 shadow-sm">
+        {error && (
+          <div className="p-4 mb-6 bg-red-100 border border-red-400 text-red-700 rounded-md">
+            {error}
+          </div>
+        )}
+
+        <div className="grid md:grid-cols-2 gap-6 bg-white border border-gray-200 rounded-xl p-8 shadow-sm">
           <div>
             <label className="block text-[#162660] font-semibold mb-2">
-              Position
+              Position Title <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              name="position"
-              value={formData.position}
+              name="title"
+              value={formData.title}
               onChange={handleInputChange}
               className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#162660]"
               placeholder="e.g. Senior Software Engineer"
@@ -140,37 +241,112 @@ export default function RecruiterJobPostPage() {
 
           <div>
             <label className="block text-[#162660] font-semibold mb-2">
-              Job Type
+              Company <span className="text-red-500">*</span>
             </label>
-            <select className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#162660]">
-              <option>Full Time</option>
-              <option>Part Time</option>
-              <option>Contract</option>
-              <option>Remote</option>
+            <input
+              type="text"
+              name="company"
+              value={formData.company}
+              onChange={handleInputChange}
+              className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#162660]"
+              placeholder="e.g. Acme Inc."
+            />
+          </div>
+
+          <div>
+            <label className="block text-[#162660] font-semibold mb-2">
+              Employment Type <span className="text-red-500">*</span>
+            </label>
+            <select
+              name="employmentType"
+              value={formData.employmentType}
+              onChange={handleInputChange}
+              className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#162660]"
+            >
+              <option value="Full-time">Full-time</option>
+              <option value="Part-time">Part-time</option>
+              <option value="Contract">Contract</option>
+              <option value="Freelance">Freelance</option>
+              <option value="Internship">Internship</option>
             </select>
           </div>
 
           <div>
             <label className="block text-[#162660] font-semibold mb-2">
-              Required Skills
+              Location <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              name="requiredSkills"
-              value={formData.requiredSkills}
+              name="location"
+              value={formData.location}
+              onChange={handleInputChange}
+              className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#162660]"
+              placeholder="e.g. San Francisco, CA or Remote"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[#162660] font-semibold mb-2">
+              Required Skills <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              name="skills"
+              value={formData.skills}
               onChange={handleInputChange}
               className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#162660]"
               placeholder="e.g. React, TypeScript, Node.js"
             />
           </div>
 
-          <div className="md:col-span-3">
+          <div>
             <label className="block text-[#162660] font-semibold mb-2">
-              Job Description
+              Experience Required
+            </label>
+            <input
+              type="text"
+              name="requiredExperience"
+              value={formData.requiredExperience}
+              onChange={handleInputChange}
+              className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#162660]"
+              placeholder="e.g. 2+ years"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[#162660] font-semibold mb-2">
+              Salary Range
+            </label>
+            <input
+              type="text"
+              name="salary"
+              value={formData.salary}
+              onChange={handleInputChange}
+              className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#162660]"
+              placeholder="e.g. $80,000 - $120,000"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[#162660] font-semibold mb-2">
+              Expiry Date
+            </label>
+            <input
+              type="date"
+              name="expiryDate"
+              value={formData.expiryDate}
+              onChange={handleInputChange}
+              className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#162660]"
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-[#162660] font-semibold mb-2">
+              Job Description <span className="text-red-500">*</span>
             </label>
             <textarea
-              name="jobDescription"
-              value={formData.jobDescription}
+              name="description"
+              value={formData.description}
               onChange={handleInputChange}
               rows={4}
               className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#162660]"
@@ -178,12 +354,13 @@ export default function RecruiterJobPostPage() {
             />
           </div>
 
-          <div className="md:col-span-3">
+          <div className="md:col-span-2">
             <Button
               onClick={handlePostJob}
+              disabled={isLoading}
               className="w-full bg-[#162660] text-white hover:bg-[#111B4A] transition-colors py-3"
             >
-              Post Job
+              {isLoading ? "Posting..." : "Post Job"}
             </Button>
           </div>
         </div>
@@ -250,7 +427,7 @@ export default function RecruiterJobPostPage() {
       {/* Success Popup */}
       {showSuccessPopup && (
         <div
-          className="fixed inset-0  bg-opacity-30 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="bg-white p-8 rounded-xl shadow-2xl text-center">

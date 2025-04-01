@@ -171,7 +171,7 @@ export default function JobsPage() {
   const fetchJobs = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/jobs');
+      const response = await fetch('http://localhost:5001/api/jobs');
       
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
@@ -206,7 +206,7 @@ export default function JobsPage() {
         return;
       }
       
-      const response = await fetch('/api/jobs/match-jobs', {
+      const response = await fetch('http://localhost:5001/api/jobs/recommended', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
