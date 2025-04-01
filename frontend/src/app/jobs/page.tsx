@@ -1,6 +1,5 @@
 // components/JobsPage.jsx
 
-// must change the fetch API end points in the code 
 "use client";
 
 import { useState, useRef, useEffect } from "react";
