@@ -58,83 +58,45 @@ const JobCard = ({ job, onViewJob }) => {
             {job.location || "Location not specified"}
           </p>
         </div>
-
-        {/* Description with fixed height */}
-        <div className="h-16 mb-3">
-          <p className="text-gray-600 text-sm line-clamp-2 overflow-hidden">
-            {job.description || "No description available"}
-          </p>
-        </div>
-
-        {/* Salary section with fixed height */}
-        <div className="h-6 mb-2">
-          {job.salary && (
-            <p className="text-gray-700 text-sm font-medium">
-              {formatSalary(job.salary)}
-            </p>
-          )}
-        </div>
-
-        {/* Skills section with fixed height */}
-        <div className="flex flex-wrap gap-1.5 mb-3 h-10 overflow-hidden">
-          {topSkills.map((skill, idx) => (
-            <span
-              key={`skill-${idx}`}
-              className="px-2 py-1 bg-[#eef1f8] rounded-full text-xs text-[#162660] font-medium"
-            >
-              {skill}
-            </span>
-          ))}
-          {job.skills && job.skills.length > 3 && (
-            <span className="px-2 py-1 bg-gray-100 rounded-full text-xs text-gray-500">
-              +{job.skills.length - 3} more
-            </span>
-          )}
-        </div>
-
-        {/* Button section - auto at bottom */}
-        <div className="flex justify-center items-center mt-auto pt-2 border-t border-gray-100">
-          <Button
-            variant="default"
-            size="sm"
-            className="bg-[#162660] hover:bg-[#0e1a45] text-white rounded-md text-xs"
-            onClick={() => onViewJob(job)}
-          >
-            View Job
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-const ResumeUploadPrompt = ({ onNavigate }) => (
-  <div className="bg-[#f0f4ff] border border-[#d0d9f5] rounded-lg p-4 mb-8">
-    <div className="flex items-start">
-      <div className="flex-shrink-0 pt-0.5">
-        <AlertCircle className="h-5 w-5 text-[#162660]" />
       </div>
-      <div className="ml-3">
-        <h3 className="text-sm font-medium text-[#162660]">Resume Required</h3>
-        <div className="mt-2 text-sm text-gray-700">
-          <p>
-            Upload your resume to start getting personalized job
-            recommendations.
-          </p>
-        </div>
-        <div className="mt-4">
-          <Button
-            size="sm"
-            className="bg-[#162660] hover:bg-[#0e1a45] text-white inline-flex items-center"
-            onClick={onNavigate}
+      <p className="text-gray-600 text-sm mb-2 line-clamp-2">
+        {job.description}
+      </p>
+      {job.salary && (
+        <p className="text-gray-700 text-sm font-medium mb-2">
+          {/* Handle salary object or number appropriately */}
+          {typeof job.salary === 'object' && job.salary.currency 
+            ? `${job.salary.currency} ${parseFloat(job.salary.amount).toLocaleString()}`
+            : typeof job.salary === 'number' 
+              ? `$${job.salary.toLocaleString()}` 
+              : job.salary}
+        </p>
+      )}
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {(job.skills || []).map((skill, idx) => (
+          <span
+            key={`${job.id || job._id}-skill-${idx}`}
+            className="px-2 py-0.5 bg-gray-100 rounded-full text-xs text-gray-700"
           >
-            <Upload className="mr-2 h-4 w-4" />
-            Upload Resume
-          </Button>
-        </div>
+            {skill}
+          </span>
+        ))}
       </div>
-    </div>
-  </div>
+      <div className="flex justify-between items-center mt-auto">
+        <span className={`font-bold text-sm ${getMatchColor(job.matchScore || job.match)}`}>
+          {job.matchScore || job.match}% Match
+        </span>
+        <Button
+          variant="default"
+          size="sm"
+          className="bg-[#162660] hover:bg-[#0e1a45] text-white rounded-md text-xs"
+          onClick={() => onViewJob(job)}
+        >
+          View Job
+        </Button>
+      </div>
+    </CardContent>
+  </Card>
 );
 
 const JobsCarousel = ({ title, jobsData, onViewJob, loading, onViewAll }) => {
@@ -375,12 +337,9 @@ export default function JobsPage() {
   const fetchRecommendedJobs = async () => {
     try {
       setRecommendedLoading(true);
-      setResumeNotFound(false);
-
-      // Check if localStorage is available (client-side only)
-      const token =
-        typeof window !== "undefined" ? localStorage.getItem("token") : null;
-
+      
+      const token = localStorage.getItem('token');
+      
       if (!token) {
         console.log(
           "No authentication token found, cannot fetch recommended jobs"
@@ -389,32 +348,30 @@ export default function JobsPage() {
         setRecommendedLoading(false);
         return;
       }
-
-      const response = await fetch(`${API_URL}/api/jobs/recommended`, {
+      
+      console.log("Fetching recommended jobs...");
+      
+      const response = await fetch('http://localhost:5001/api/jobs/recommended', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
       if (!response.ok) {
-        if (response.status === 401) {
-          console.log("Authentication failed for recommended jobs");
-        } else if (response.status === 404) {
-          console.log("Resume not found for job recommendations");
-          setResumeNotFound(true);
-        } else {
-          console.log(`Error response status: ${response.status}`);
-        }
-        setRecommendedJobs([]);
-        return;
+        console.error(`Error response: ${response.status}`);
+        throw new Error(`HTTP error! Status: ${response.status}`);
       }
 
       const data = await response.json();
-
+      console.log("Recommended jobs response:", data);
+      
+      // Handle both possible response structures
       if (data.recommendedJobs && Array.isArray(data.recommendedJobs)) {
         setRecommendedJobs(data.recommendedJobs);
+      } else if (data.matchedJobs && Array.isArray(data.matchedJobs)) {
+        setRecommendedJobs(data.matchedJobs);
       } else {
-        console.error("Invalid recommended jobs data format:", data);
+        console.error("Invalid recommended jobs format:", data);
         setRecommendedJobs([]);
       }
     } catch (error) {
@@ -425,8 +382,51 @@ export default function JobsPage() {
     }
   };
 
-  const handleSearch = () => {
-    fetchJobs();
+  const handleSearch = async () => {
+    try {
+      setLoading(true);
+      
+      // Build query string from search and filters
+      let queryParams = [];
+      
+      if (search) {
+        queryParams.push(`search=${encodeURIComponent(search)}`);
+      }
+      
+      if (filters.skills && filters.skills.length > 0) {
+        queryParams.push(`skills=${encodeURIComponent(filters.skills.join(','))}`);
+      }
+      
+      if (filters.location) {
+        queryParams.push(`location=${encodeURIComponent(filters.location)}`);
+      }
+      
+      if (filters.experience) {
+        queryParams.push(`experience=${encodeURIComponent(filters.experience)}`);
+      }
+      
+      // Fix the URL to include the base URL
+      const url = `http://localhost:5001/api/jobs${queryParams.length > 0 ? `?${queryParams.join('&')}` : ''}`;
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.jobs && Array.isArray(data.jobs)) {
+        setAllJobs(data.jobs);
+      } else {
+        console.error("Invalid jobs data format:", data);
+        setAllJobs([]);
+      }
+    } catch (error) {
+      console.error("Error searching jobs:", error);
+      setAllJobs([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleViewJob = (job) => {

@@ -3,6 +3,7 @@ const router = express.Router();
 const fs = require("fs");
 const path = require("path");
 const pdf = require("pdf-parse");
+const mongoose = require("mongoose");
 const {
   analyzeResumeWithGemini,
   extractSkillsFromResume,
@@ -10,10 +11,25 @@ const {
 } = require("../services/geminiService");
 
 // Import MongoDB models
-const {Resume,ATSAnalysis} = require("../models/ResumeModel");
+const Resume = require("../models/ResumeModel");
+const ATSAnalysis = require("../models/ATSAnalysisSchema");
 
+// Auth middleware for protected routes
+const { authMiddleware } = require("../middlewares/authMiddleware");
 
-router.post("/upload", async (req, res) => {
+/**
+ * @route POST /api/resumes/upload
+ * @desc Upload and process a resume
+ * @access Private
+ */
+// Improved version of the resume routes
+
+/**
+ * @route POST /api/resumes/upload
+ * @desc Upload and process a resume
+ * @access Private
+ */
+router.post("/upload", authMiddleware, async (req, res) => {
   try {
     // Check if file was uploaded
     if (!req.files || !req.files.resume) {
@@ -22,7 +38,13 @@ router.post("/upload", async (req, res) => {
     
     const resumeFile = req.files.resume;
     const jobDescription = req.body.jobDescription || "";
-    const userId = req.body.userId; // Assuming you're sending userId in the request
+    const userId = req.user.userId;
+    
+    // Validate file type
+    if (!resumeFile.name.match(/\.(pdf)$/i)) {
+      return res.status(400).json({ error: "Only PDF files are supported" });
+    }
+    
     const uploadPath = path.join(__dirname, "../uploads", resumeFile.name);
     
     // Ensure uploads directory exists
@@ -57,12 +79,28 @@ router.post("/upload", async (req, res) => {
       skills: extractedSkills,
       experience: resumeAnalysis.experience,
       feedback: resumeAnalysis.feedback,
-      userId: userId || null,
+      userId: userId,
       uploadDate: new Date()
     };
     
-    // Save to MongoDB
-    const savedResume = await Resume.create(resumeData);
+    // Check for existing resume and replace if it exists
+    let savedResume;
+    const existingResume = await Resume.findOne({ userId: userId })
+      .sort({ uploadDate: -1 });
+    
+    if (existingResume) {
+      // Update existing resume
+      savedResume = await Resume.findByIdAndUpdate(
+        existingResume._id,
+        resumeData,
+        { new: true, runValidators: true }
+      );
+      console.log(`Updated existing resume for user ${userId}`);
+    } else {
+      // Create new resume
+      savedResume = await Resume.create(resumeData);
+      console.log(`Created new resume for user ${userId}`);
+    }
     
     // Save ATS analysis if available
     let atsAnalysisData = null;
@@ -75,14 +113,14 @@ router.post("/upload", async (req, res) => {
         feedback: atsScore.feedback,
         missingKeywords: atsScore.missingKeywords,
         foundKeywords: atsScore.matchedKeywords,
-        userId: userId || null,
+        userId: userId,
         analysisDate: new Date()
       });
     }
     
     // Prepare response
     const response = {
-      message: "Resume uploaded, processed, and saved successfully",
+      message: existingResume ? "Resume updated successfully" : "Resume uploaded, processed, and saved successfully",
       resumeId: savedResume._id,
       rawText: pdfData.text.substring(0, 200) + "...", // Truncated for response
       textLength: pdfData.text.length,
@@ -108,9 +146,12 @@ router.post("/upload", async (req, res) => {
     });
   }
 });
-
-// ATS scoring route with MongoDB integration
-router.post("/ats-score", async (req, res) => {
+/**
+ * @route POST /api/resumes/ats-score
+ * @desc Calculate ATS score for a resume
+ * @access Private
+ */
+router.post("/ats-score", authMiddleware, async (req, res) => {
   try {
     // Check if resume file and job description are provided
     if (!req.files || !req.files.resume) {
@@ -123,7 +164,13 @@ router.post("/ats-score", async (req, res) => {
     
     const resumeFile = req.files.resume;
     const jobDescription = req.body.jobDescription;
-    const userId = req.body.userId;
+    const userId = req.user.userId;
+    
+    // Validate userId
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: "Valid user ID is required" });
+    }
+    
     const uploadPath = path.join(__dirname, "../uploads", resumeFile.name);
     
     // Ensure uploads directory exists
@@ -149,11 +196,26 @@ router.post("/ats-score", async (req, res) => {
     const resumeData = {
       fileName: resumeFile.name,
       rawText: pdfData.text,
-      userId: userId || null,
+      userId: mongoose.Types.ObjectId(userId),
       uploadDate: new Date()
     };
     
-    const savedResume = await Resume.create(resumeData);
+    // Check for existing resume to update
+    const existingResume = await Resume.findOne({ userId: mongoose.Types.ObjectId(userId) })
+      .sort({ uploadDate: -1 });
+      
+    let savedResume;
+    if (existingResume) {
+      // Update existing resume
+      savedResume = await Resume.findByIdAndUpdate(
+        existingResume._id,
+        resumeData,
+        { new: true, runValidators: true }
+      );
+    } else {
+      // Create new resume
+      savedResume = await Resume.create(resumeData);
+    }
     
     // Then save the ATS analysis
     const atsAnalysisData = await ATSAnalysis.create({
@@ -164,7 +226,7 @@ router.post("/ats-score", async (req, res) => {
       feedback: atsScore.feedback,
       missingKeywords: atsScore.missingKeywords,
       foundKeywords: atsScore.matchedKeywords,
-      userId: userId || null,
+      userId: mongoose.Types.ObjectId(userId),
       analysisDate: new Date()
     });
     
@@ -185,11 +247,26 @@ router.post("/ats-score", async (req, res) => {
   }
 });
 
-// Get all resumes for a user
-router.get("/user/:userId", async (req, res) => {
+/**
+ * @route GET /api/resumes/user/:userId
+ * @desc Get all resumes for a user
+ * @access Private
+ */
+router.get("/user/:userId", authMiddleware, async (req, res) => {
   try {
     const userId = req.params.userId;
-    const resumes = await Resume.find({ userId }).sort({ uploadDate: -1 });
+    
+    // Ensure requested userId matches authenticated user or user is admin
+    if (req.user.userId !== userId && req.user.role !== 'admin') {
+      return res.status(403).json({ error: "Not authorized to access these resumes" });
+    }
+    
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: "Invalid user ID format" });
+    }
+    
+    const resumes = await Resume.find({ userId: mongoose.Types.ObjectId(userId) })
+      .sort({ uploadDate: -1 });
     
     res.json({
       message: "Resumes retrieved successfully",
@@ -210,10 +287,57 @@ router.get("/user/:userId", async (req, res) => {
   }
 });
 
-// Get a specific resume with its analysis
-router.get("/:resumeId", async (req, res) => {
+/**
+ * @route GET /api/resumes/current
+ * @desc Get current user's latest resume
+ * @access Private
+ */
+router.get("/current", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    const resume = await Resume.findOne({ userId: mongoose.Types.ObjectId(userId) })
+      .sort({ uploadDate: -1 });
+    
+    if (!resume) {
+      return res.status(404).json({ 
+        error: "Resume not found", 
+        message: "Please upload a resume first" 
+      });
+    }
+    
+    res.json({
+      message: "Current resume retrieved successfully",
+      resume: {
+        id: resume._id,
+        fileName: resume.fileName,
+        uploadDate: resume.uploadDate,
+        skills: resume.skills,
+        experience: resume.experience,
+        feedback: resume.feedback
+      }
+    });
+  } catch (error) {
+    console.error("Error retrieving current resume:", error);
+    res.status(500).json({
+      error: "Failed to retrieve current resume",
+      details: error.message
+    });
+  }
+});
+
+/**
+ * @route GET /api/resumes/:resumeId
+ * @desc Get a specific resume with its analysis
+ * @access Private
+ */
+router.get("/:resumeId", authMiddleware, async (req, res) => {
   try {
     const resumeId = req.params.resumeId;
+    
+    if (!mongoose.Types.ObjectId.isValid(resumeId)) {
+      return res.status(400).json({ error: "Invalid resume ID format" });
+    }
     
     // Find resume and any associated ATS analyses
     const [resume, atsAnalyses] = await Promise.all([
@@ -223,6 +347,11 @@ router.get("/:resumeId", async (req, res) => {
     
     if (!resume) {
       return res.status(404).json({ error: "Resume not found" });
+    }
+    
+    // Check if user is authorized to access this resume
+    if (resume.userId.toString() !== req.user.userId && req.user.role !== 'admin') {
+      return res.status(403).json({ error: "Not authorized to access this resume" });
     }
     
     res.json({
@@ -254,10 +383,30 @@ router.get("/:resumeId", async (req, res) => {
   }
 });
 
-// Delete a resume and its associated analyses
-router.delete("/:resumeId", async (req, res) => {
+/**
+ * @route DELETE /api/resumes/:resumeId
+ * @desc Delete a resume and its associated analyses
+ * @access Private
+ */
+router.delete("/:resumeId", authMiddleware, async (req, res) => {
   try {
     const resumeId = req.params.resumeId;
+    
+    if (!mongoose.Types.ObjectId.isValid(resumeId)) {
+      return res.status(400).json({ error: "Invalid resume ID format" });
+    }
+    
+    // Find the resume first to check authorization
+    const resume = await Resume.findById(resumeId);
+    
+    if (!resume) {
+      return res.status(404).json({ error: "Resume not found" });
+    }
+    
+    // Check if user is authorized to delete this resume
+    if (resume.userId.toString() !== req.user.userId && req.user.role !== 'admin') {
+      return res.status(403).json({ error: "Not authorized to delete this resume" });
+    }
     
     // Delete both resume and associated ATS analyses
     await Promise.all([
