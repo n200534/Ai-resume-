@@ -4,7 +4,6 @@ require('dotenv').config(); // Ensure environment variables are loaded
 // Middleware to protect routes
 const authMiddleware = (req, res, next) => {
   // Extract token from Authorization header
-  // Typically, tokens are sent as "Bearer <token>"
   const authHeader = req.header("Authorization");
   
   if (!authHeader) {
@@ -12,8 +11,8 @@ const authMiddleware = (req, res, next) => {
   }
 
   // Remove "Bearer " prefix if present
-  const token = authHeader.startsWith("Bearer ") 
-    ? authHeader.slice(7) 
+  const token = authHeader.startsWith("Bearer ")
+    ? authHeader.slice(7)
     : authHeader;
 
   if (!token) {
@@ -21,16 +20,22 @@ const authMiddleware = (req, res, next) => {
   }
 
   try {
-    // Use environment variable for secret key
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
     // Verify the secret exists
     if (!process.env.JWT_SECRET) {
       console.error("JWT_SECRET is not defined");
       return res.status(500).json({ error: "Server configuration error" });
     }
 
-    req.user = decoded; // Attach user info to request
+    // Use environment variable for secret key
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Ensure userId is explicitly set in the user object as a string
+    // This ensures compatibility with routes expecting req.user.userId
+    req.user = {
+      ...decoded,
+      userId: (decoded.userId || decoded._id || decoded.id || '').toString()
+    };
+    
     next();
   } catch (err) {
     console.error("Token Verification Error:", err);

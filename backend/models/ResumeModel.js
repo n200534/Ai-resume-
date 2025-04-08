@@ -1,31 +1,26 @@
 const mongoose = require('mongoose');
+const Schema = mongoose.Schema;
 
-const ResumeSchema = new mongoose.Schema({
+const ResumeSchema = new Schema({
   fileName: String,
   rawText: String,
   skills: [String],
   experience: String,
   feedback: String,
-  userId: String,
-  uploadDate: Date
+  userId: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true  // Add index for better query performance
+  },
+  uploadDate: {
+    type: Date,
+    default: Date.now
+  }
 });
 
-const ATSAnalysisSchema = new mongoose.Schema({
-  resumeId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Resume'
-  },
-  jobDescription: String,
-  score: Number,
-  matchPercentage: Number,
-  feedback: String,
-  missingKeywords: [String],
-  foundKeywords: [String],
-  userId: String,
-  analysisDate: Date
-});
+// Add a compound index to ensure uniqueness and for faster queries
+ResumeSchema.index({ userId: 1, uploadDate: -1 });
 
 const Resume = mongoose.model('Resume', ResumeSchema);
-const ATSAnalysis = mongoose.model('ATSAnalysis', ATSAnalysisSchema);
-
-module.exports = { Resume, ATSAnalysis };
+module.exports = Resume;

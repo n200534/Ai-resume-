@@ -82,9 +82,9 @@ export default function ResumePage() {
         method: "POST",
         body: formData,
         // If you have authentication, uncomment and adjust
-        // headers: {
-        //   Authorization: `Bearer ${localStorage.getItem("token")}`,
-        // },
+        headers: {
+           Authorization: `Bearer ${localStorage.getItem("token")}`,
+         },
       });
 
       if (!response.ok) {

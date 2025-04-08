@@ -1,5 +1,3 @@
-// components/JobsPage.jsx
-
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -42,7 +40,12 @@ const JobCard = ({ job, onViewJob }) => (
       </p>
       {job.salary && (
         <p className="text-gray-700 text-sm font-medium mb-2">
-          ${typeof job.salary === 'number' ? job.salary.toLocaleString() : job.salary}
+          {/* Handle salary object or number appropriately */}
+          {typeof job.salary === 'object' && job.salary.currency 
+            ? `${job.salary.currency} ${parseFloat(job.salary.amount).toLocaleString()}`
+            : typeof job.salary === 'number' 
+              ? `$${job.salary.toLocaleString()}` 
+              : job.salary}
         </p>
       )}
       <div className="flex flex-wrap gap-1.5 mb-3">
@@ -196,8 +199,8 @@ export default function JobsPage() {
   const fetchRecommendedJobs = async () => {
     try {
       setRecommendedLoading(true);
-      // Check if localStorage is available (client-side only)
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      
+      const token = localStorage.getItem('token');
       
       if (!token) {
         console.log("No authentication token found, cannot fetch recommended jobs");
@@ -206,6 +209,8 @@ export default function JobsPage() {
         return;
       }
       
+      console.log("Fetching recommended jobs...");
+      
       const response = await fetch('http://localhost:5001/api/jobs/recommended', {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -213,26 +218,20 @@ export default function JobsPage() {
       });
       
       if (!response.ok) {
-        if (response.status === 401) {
-          console.log("Authentication failed for recommended jobs");
-        } else {
-          console.error(`Error response: ${response.status}`);
-        }
-        setRecommendedJobs([]);
-        return;
+        console.error(`Error response: ${response.status}`);
+        throw new Error(`HTTP error! Status: ${response.status}`);
       }
       
       const data = await response.json();
+      console.log("Recommended jobs response:", data);
       
-      if (data.matchedJobs && Array.isArray(data.matchedJobs)) {
-        // Sort by match score and take top matches
-        const topMatches = [...data.matchedJobs]
-          .sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0))
-          .slice(0, 10);
-          
-        setRecommendedJobs(topMatches);
+      // Handle both possible response structures
+      if (data.recommendedJobs && Array.isArray(data.recommendedJobs)) {
+        setRecommendedJobs(data.recommendedJobs);
+      } else if (data.matchedJobs && Array.isArray(data.matchedJobs)) {
+        setRecommendedJobs(data.matchedJobs);
       } else {
-        console.error("Invalid matched jobs data format:", data);
+        console.error("Invalid recommended jobs format:", data);
         setRecommendedJobs([]);
       }
     } catch (error) {
@@ -266,7 +265,8 @@ export default function JobsPage() {
         queryParams.push(`experience=${encodeURIComponent(filters.experience)}`);
       }
       
-      const url = `/api/jobs${queryParams.length > 0 ? `?${queryParams.join('&')}` : ''}`;
+      // Fix the URL to include the base URL
+      const url = `http://localhost:5001/api/jobs${queryParams.length > 0 ? `?${queryParams.join('&')}` : ''}`;
       const response = await fetch(url);
       
       if (!response.ok) {
