@@ -1,10 +1,16 @@
 // routes/jobRoutes.js
 const express = require("express");
 const mongoose = require("mongoose");
-const { predictJobSuccess, semanticJobMatching } = require("../services/jobMatchingService");
+const {
+  predictJobSuccess,
+  semanticJobMatching,
+} = require("../services/jobMatchingService");
 const Job = require("../models/JobModel");
 const Resume = require("../models/ResumeModel");
-const { authMiddleware, roleMiddleware } = require("../middlewares/authMiddleware");
+const {
+  authMiddleware,
+  roleMiddleware,
+} = require("../middlewares/authMiddleware");
 
 const router = express.Router();
 
@@ -13,103 +19,139 @@ const router = express.Router();
  * @desc Create a new job posting
  * @access Private (Recruiters only)
  */
-router.post("/create", authMiddleware, roleMiddleware("recruiter"), async (req, res) => {
-  try {
-    const { title, company, description, skills, location, salary, requiredExperience, employmentType, expiryDate } = req.body;
-    
-    // Validate required fields
-    if (!title || !company || !description || !skills || !location) {
-      return res.status(400).json({ error: "Missing required fields" });
+router.post(
+  "/create",
+  authMiddleware,
+  roleMiddleware("recruiter"),
+  async (req, res) => {
+    try {
+      const {
+        title,
+        company,
+        description,
+        skills,
+        location,
+        salary,
+        requiredExperience,
+        employmentType,
+        expiryDate,
+      } = req.body;
+
+      // Validate required fields
+      if (!title || !company || !description || !skills || !location) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      // Process skills array (handle both comma-separated string and array)
+      let skillsArray = skills;
+      if (typeof skills === "string") {
+        skillsArray = skills.split(",").map((skill) => skill.trim());
+      }
+
+      const newJob = new Job({
+        title,
+        company,
+        description,
+        skills: skillsArray,
+        location,
+        salary,
+        requiredExperience,
+        employmentType,
+        expiryDate,
+        postedBy: new mongoose.Types.ObjectId(req.user.userId),
+      });
+
+      await newJob.save();
+
+      res.json({
+        message: "Job posted successfully",
+        job: newJob,
+      });
+    } catch (error) {
+      console.error("Job creation error:", error);
+      res.status(500).json({
+        error: "Failed to create job",
+        details: error.message,
+      });
     }
-    
-    // Process skills array (handle both comma-separated string and array)
-    let skillsArray = skills;
-    if (typeof skills === 'string') {
-      skillsArray = skills.split(',').map(skill => skill.trim());
-    }
-    
-    const newJob = new Job({
-      title,
-      company,
-      description,
-      skills: skillsArray,
-      location,
-      salary,
-      requiredExperience,
-      employmentType,
-      expiryDate,
-      // Fixed line - using new with ObjectId constructor
-      postedBy: new mongoose.Types.ObjectId(req.user.userId)
-    });
-    
-    await newJob.save();
-    
-    res.json({
-      message: "Job posted successfully",
-      job: newJob
-    });
-  } catch (error) {
-    console.error("Job creation error:", error);
-    res.status(500).json({
-      error: "Failed to create job",
-      details: error.message
-    });
   }
-});
+);
 
 /**
  * @route GET /api/jobs
- * @desc Get all jobs with optional filtering
+ * @desc Get all jobs with optional filtering and pagination
  * @access Public
  */
 router.get("/", async (req, res) => {
   try {
-    const { search, skills, location, experience, type } = req.query;
-    
+    const {
+      search,
+      skills,
+      location,
+      experience,
+      type,
+      page = 1,
+      limit = 10,
+    } = req.query;
+
     // Build filter object
     const filter = { isActive: true };
-    
+
     // Add text search if provided
     if (search) {
       filter.$text = { $search: search };
     }
-    
+
     // Add skills filter if provided
     if (skills) {
-      const skillsArray = skills.split(',').map(skill => skill.trim());
+      const skillsArray = skills.split(",").map((skill) => skill.trim());
       filter.skills = { $in: skillsArray };
     }
-    
+
     // Add location filter if provided
     if (location) {
-      filter.location = { $regex: location, $options: 'i' };
+      filter.location = { $regex: location, $options: "i" };
     }
-    
+
     // Add experience filter if provided
     if (experience) {
       filter.requiredExperience = { $lte: Number(experience) };
     }
-    
+
     // Add employment type filter if provided
     if (type) {
       filter.employmentType = type;
     }
-    
-    // Fetch jobs with filter
+
+    // Pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const pageLimit = parseInt(limit);
+
+    // Count total matching documents for pagination info
+    const total = await Job.countDocuments(filter);
+
+    // Fetch jobs with filter and pagination
     const jobs = await Job.find(filter)
       .sort({ postedDate: -1 })
-      .populate('postedBy', 'name company')
+      .skip(skip)
+      .limit(pageLimit)
+      .populate("postedBy", "name company")
       .exec();
-    
+
     res.json({
-      count: jobs.length,
-      jobs
+      jobs,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: pageLimit,
+        pages: Math.ceil(total / pageLimit),
+      },
     });
   } catch (error) {
     console.error("Error fetching jobs:", error);
     res.status(500).json({
       error: "Failed to fetch jobs",
-      details: error.message
+      details: error.message,
     });
   }
 });
@@ -121,59 +163,64 @@ router.get("/", async (req, res) => {
  */
 router.get("/match-jobs", authMiddleware, async (req, res) => {
   try {
-    const userId = mongoose.Types.ObjectId(req.user.userId);
-    
+    const userId = new mongoose.Types.ObjectId(req.user.userId);
+
     // Find user's most recent resume
     const resume = await Resume.findOne({ userId })
       .sort({ uploadDate: -1 })
       .exec();
-    
+
     if (!resume) {
-      return res.status(404).json({ 
-        error: "Resume not found", 
-        message: "Please upload your resume first to get job recommendations." 
+      return res.status(404).json({
+        error: "Resume not found",
+        message: "Please upload your resume first to get job recommendations.",
       });
     }
-    
+
     // Get active jobs
     const jobs = await Job.find({ isActive: true })
       .sort({ postedDate: -1 })
-      .populate('postedBy', 'name company');
-    
+      .populate("postedBy", "name company");
+
     // Calculate match score for each job
-    const matchedJobs = await Promise.all(jobs.map(async job => {
-      // Use semantic matching for more detailed analysis
-      const jobObject = job.toObject();
-      
-      // Basic match calculation
-      const matchScore = predictJobSuccess(resume, jobObject);
-      
-      // More detailed semantic matching if we have raw text
-      let semanticMatch = null;
-      if (resume.rawText && job.description) {
-        semanticMatch = semanticJobMatching(resume.rawText, job.description);
-      }
-      
-      return {
-        ...jobObject,
-        matchScore: semanticMatch ? semanticMatch.score : matchScore,
-        matchDetails: semanticMatch
-      };
-    }));
-    
+    const matchedJobs = await Promise.all(
+      jobs.map(async (job) => {
+        // Use semantic matching for more detailed analysis
+        const jobObject = job.toObject();
+
+        // Basic match calculation
+        const matchScore = predictJobSuccess(resume, jobObject);
+
+        // More detailed semantic matching if we have raw text
+        let semanticMatch = null;
+        if (resume.rawText && job.description) {
+          semanticMatch = await semanticJobMatching(
+            resume.rawText,
+            job.description
+          );
+        }
+
+        return {
+          ...jobObject,
+          matchScore: semanticMatch ? semanticMatch.score : matchScore,
+          matchDetails: semanticMatch,
+        };
+      })
+    );
+
     // Sort by match score (highest first)
     matchedJobs.sort((a, b) => b.matchScore - a.matchScore);
-    
-    res.json({ 
+
+    res.json({
       message: "Job recommendations generated successfully",
       count: matchedJobs.length,
-      matchedJobs 
+      matchedJobs,
     });
   } catch (error) {
     console.error("Error generating job recommendations:", error);
     res.status(500).json({
       error: "Failed to generate job recommendations",
-      details: error.message
+      details: error.message,
     });
   }
 });
@@ -186,77 +233,72 @@ router.get("/match-jobs", authMiddleware, async (req, res) => {
 router.get("/recommended", authMiddleware, async (req, res) => {
   try {
     // Safely convert userId to ObjectId
-    let userId;
-    try {
-      userId = new mongoose.Types.ObjectId(req.user.userId);
-    } catch (error) {
-      return res.status(400).json({
-        error: "Invalid user ID format",
-        message: "User ID could not be processed",
-        details: error.message
-      });
-    }
-    
+    const userId = new mongoose.Types.ObjectId(req.user.userId);
+
     // Find user's latest resume
     const resume = await Resume.findOne({ userId })
       .sort({ uploadDate: -1 })
       .exec();
-    
+
     if (!resume) {
       return res.json({
         count: 0,
         recommendedJobs: [],
-        message: "No resume found. Please upload your resume to get job recommendations."
+        message:
+          "No resume found. Please upload your resume to get job recommendations.",
       });
     }
-    
-    console.log("User resume found:", resume._id);
-    console.log("Resume skills:", resume.skills);
-    
-    // Get active jobs
+
+    // Get active jobs with pagination
+    const { page = 1, limit = 10 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const pageLimit = parseInt(limit);
+
     const jobs = await Job.find({ isActive: true })
       .sort({ postedDate: -1 })
-      .populate('postedBy', 'name company');
-    
-    console.log(`Found ${jobs.length} active jobs`);
-    
+      .skip(skip)
+      .limit(pageLimit)
+      .populate("postedBy", "name company");
+
     // Map jobs with try/catch for each job
     const matchedJobs = [];
-    
+
     for (const job of jobs) {
       try {
         const jobObject = job.toObject();
-        console.log(`Processing job: ${job._id}, title: ${job.title}`);
-        console.log(`Job skills: ${job.skills}`);
-        
         const matchScore = predictJobSuccess(resume, jobObject);
-        console.log(`Job ${job._id} match score: ${matchScore}`);
-        
+
         // Include all jobs with their match scores
         matchedJobs.push({
           ...jobObject,
-          matchScore
+          matchScore,
         });
       } catch (error) {
         console.error(`Error processing job ${job._id}:`, error);
         // Skip this job
       }
     }
-    
+
     // Sort by match score (highest first)
     matchedJobs.sort((a, b) => b.matchScore - a.matchScore);
-    
-    console.log(`Returning ${matchedJobs.length} jobs sorted by match score`);
-    
+
+    // Get total count for pagination
+    const total = await Job.countDocuments({ isActive: true });
+
     res.json({
-      count: matchedJobs.length,
-      recommendedJobs: matchedJobs
+      recommendedJobs: matchedJobs,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: pageLimit,
+        pages: Math.ceil(total / pageLimit),
+      },
     });
   } catch (error) {
     console.error("Error fetching recommended jobs:", error);
     res.status(500).json({
       error: "Failed to fetch recommended jobs",
-      details: error.message
+      details: error.message,
     });
   }
 });
@@ -264,44 +306,47 @@ router.get("/recommended", authMiddleware, async (req, res) => {
 /**
  * @route GET /api/jobs/:jobId
  * @desc Get a specific job by ID
- * @access Public
+ * @access Public (with optional auth for match score)
  */
 router.get("/:jobId", async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.jobId)) {
       return res.status(400).json({ error: "Invalid job ID format" });
     }
-    
+
     const job = await Job.findById(req.params.jobId)
-      .populate('postedBy', 'name company')
+      .populate("postedBy", "name company")
       .exec();
-    
+
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
     }
-    
-    // If logged in and has resume, calculate match score
-    let matchScore = null;
+
+    const response = { job };
+
+    // If user is authenticated, calculate match score
     if (req.user) {
-      const userId = mongoose.Types.ObjectId(req.user.userId);
-      const resume = await Resume.findOne({ userId })
-        .sort({ uploadDate: -1 })
-        .exec();
-      
-      if (resume) {
-        matchScore = predictJobSuccess(resume, job);
+      try {
+        const userId = new mongoose.Types.ObjectId(req.user.userId);
+        const resume = await Resume.findOne({ userId })
+          .sort({ uploadDate: -1 })
+          .exec();
+
+        if (resume) {
+          response.matchScore = predictJobSuccess(resume, job);
+        }
+      } catch (error) {
+        console.error("Error calculating match score:", error);
+        // Continue without match score
       }
     }
-    
-    res.json({
-      job,
-      matchScore
-    });
+
+    res.json(response);
   } catch (error) {
     console.error("Error fetching job details:", error);
     res.status(500).json({
       error: "Failed to fetch job details",
-      details: error.message
+      details: error.message,
     });
   }
 });
@@ -316,38 +361,43 @@ router.put("/:jobId", authMiddleware, async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(req.params.jobId)) {
       return res.status(400).json({ error: "Invalid job ID format" });
     }
-    
+
     const job = await Job.findById(req.params.jobId);
-    
+
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
     }
-    
+
     // Check if user is the job creator or admin
-    if (job.postedBy.toString() !== req.user.userId && req.user.role !== 'admin') {
-      return res.status(403).json({ error: "Not authorized to update this job" });
+    if (
+      job.postedBy.toString() !== req.user.userId &&
+      req.user.role !== "admin"
+    ) {
+      return res
+        .status(403)
+        .json({ error: "Not authorized to update this job" });
     }
-    
+
     // Process skills array if provided
-    if (req.body.skills && typeof req.body.skills === 'string') {
-      req.body.skills = req.body.skills.split(',').map(skill => skill.trim());
+    if (req.body.skills && typeof req.body.skills === "string") {
+      req.body.skills = req.body.skills.split(",").map((skill) => skill.trim());
     }
-    
+
     const updatedJob = await Job.findByIdAndUpdate(
       req.params.jobId,
       { $set: req.body },
       { new: true, runValidators: true }
     );
-    
+
     res.json({
       message: "Job updated successfully",
-      job: updatedJob
+      job: updatedJob,
     });
   } catch (error) {
     console.error("Error updating job:", error);
     res.status(500).json({
       error: "Failed to update job",
-      details: error.message
+      details: error.message,
     });
   }
 });
@@ -362,28 +412,33 @@ router.delete("/:jobId", authMiddleware, async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(req.params.jobId)) {
       return res.status(400).json({ error: "Invalid job ID format" });
     }
-    
+
     const job = await Job.findById(req.params.jobId);
-    
+
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
     }
-    
+
     // Check if user is the job creator or admin
-    if (job.postedBy.toString() !== req.user.userId && req.user.role !== 'admin') {
-      return res.status(403).json({ error: "Not authorized to delete this job" });
+    if (
+      job.postedBy.toString() !== req.user.userId &&
+      req.user.role !== "admin"
+    ) {
+      return res
+        .status(403)
+        .json({ error: "Not authorized to delete this job" });
     }
-    
+
     await Job.findByIdAndDelete(req.params.jobId);
-    
+
     res.json({
-      message: "Job deleted successfully"
+      message: "Job deleted successfully",
     });
   } catch (error) {
     console.error("Error deleting job:", error);
     res.status(500).json({
       error: "Failed to delete job",
-      details: error.message
+      details: error.message,
     });
   }
 });
@@ -398,59 +453,61 @@ router.post("/:jobId/apply", authMiddleware, async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(req.params.jobId)) {
       return res.status(400).json({ error: "Invalid job ID format" });
     }
-    
+
     // Find the job
     const job = await Job.findById(req.params.jobId);
-    
+
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
     }
-    
-    const userId = mongoose.Types.ObjectId(req.user.userId);
-    
+
+    const userId = new mongoose.Types.ObjectId(req.user.userId);
+
     // Check if user has already applied
-    const alreadyApplied = job.applicants.some(applicant => 
-      applicant.userId.toString() === req.user.userId
+    const alreadyApplied = job.applicants.some(
+      (applicant) => applicant.userId.toString() === req.user.userId
     );
-    
+
     if (alreadyApplied) {
-      return res.status(400).json({ error: "You have already applied for this job" });
+      return res
+        .status(400)
+        .json({ error: "You have already applied for this job" });
     }
-    
+
     // Find user's latest resume
     const resume = await Resume.findOne({ userId })
       .sort({ uploadDate: -1 })
       .exec();
-    
+
     if (!resume) {
-      return res.status(404).json({ 
-        error: "Resume not found", 
-        message: "Please upload your resume first before applying." 
+      return res.status(404).json({
+        error: "Resume not found",
+        message: "Please upload your resume first before applying.",
       });
     }
-    
+
     // Calculate match score
     const matchScore = predictJobSuccess(resume, job);
-    
+
     // Add user to applicants
     job.applicants.push({
       userId,
       resumeId: resume._id,
       matchScore: matchScore,
-      appliedDate: new Date()
+      appliedDate: new Date(),
     });
-    
+
     await job.save();
-    
+
     res.json({
       message: "Application submitted successfully",
-      matchScore: matchScore
+      matchScore: matchScore,
     });
   } catch (error) {
     console.error("Error applying for job:", error);
     res.status(500).json({
       error: "Failed to submit application",
-      details: error.message
+      details: error.message,
     });
   }
 });
