@@ -504,7 +504,7 @@ router.post("/:jobId/apply", authMiddleware, async (req, res) => {
       matchScore: matchScore,
     });
   } catch (error) {
-    console.error("Error applying for job:", error);
+    console.error("YOU have already applied for this job");
     res.status(500).json({
       error: "Failed to submit application",
       details: error.message,

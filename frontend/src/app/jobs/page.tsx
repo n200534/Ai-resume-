@@ -624,13 +624,8 @@ export default function JobsPage() {
   };
 
   const handleViewJob = (job) => {
-    // Navigate to job details page
-    const jobId = job._id;
-    if (jobId) {
-      router.push(`/jobs/${jobId}`);
-    } else {
-      console.error("Cannot navigate to job details: Missing job ID", job);
-    }
+    // MODIFIED: Now navigates to /viewjobs instead of /jobs/${jobId}
+    router.push("jobs/viewjob");
   };
 
   const handleKeyPress = (e) => {
