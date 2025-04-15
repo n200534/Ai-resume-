@@ -469,4 +469,73 @@ router.delete("/:resumeId", authMiddleware, async (req, res) => {
   }
 });
 
+/**
+ * @route GET /api/resumes/user-resume/:userId
+ * @desc Get a user's resume by userId
+ * @access Private
+ */
+router.get("/user-resume/:userId", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: "Invalid user ID format" });
+    }
+
+    // Find the most recent resume for the specified user
+    const resume = await Resume.findOne({
+      userId: new mongoose.Types.ObjectId(userId),
+    }).sort({ uploadDate: -1 });
+
+    if (!resume) {
+      return res.status(404).json({
+        error: "Resume not found",
+        message: "No resume found for this user",
+      });
+    }
+
+    res.json({
+      message: "Resume retrieved successfully",
+      resume: {
+        id: resume._id,
+        fileName: resume.fileName,
+        uploadDate: resume.uploadDate,
+        skills: resume.skills,
+        experience: resume.experience,
+        feedback: resume.feedback,
+      },
+    });
+  } catch (error) {
+    console.error("Error retrieving user resume:", error);
+    res.status(500).json({
+      error: "Failed to retrieve user resume",
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * @route GET /api/users
+ * @desc Get all users (for admin or recruiters)
+ * @access Private
+ */
+router.get("/users", authMiddleware, async (req, res) => {
+  try {
+    // This assumes you have a User model and this route would be added to the appropriate router
+    // For example, in a userRoutes.js file
+    const users = await User.find({}, 'name email role');
+    
+    res.json({
+      message: "Users retrieved successfully",
+      users
+    });
+  } catch (error) {
+    console.error("Error retrieving users:", error);
+    res.status(500).json({
+      error: "Failed to retrieve users",
+      details: error.message
+    });
+  }
+});
+
 module.exports = router;

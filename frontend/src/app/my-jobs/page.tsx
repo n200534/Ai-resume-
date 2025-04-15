@@ -81,43 +81,45 @@ export default function MyJobsPage() {
     }
   };
 
-  const fetchCandidateDetails = async (userId) => {
-    console.log("Fetching details for userId:", userId); // Debug log
-    const token = getAuthToken();
-    if (!token) {
-      console.error("No auth token found");
-      setProfileError("Authentication required. Please log in.");
-      return;
+// Updated fetchCandidateDetails function
+const fetchCandidateDetails = async (userId) => {
+  console.log("Fetching details for userId:", userId);
+  const token = getAuthToken();
+  if (!token) {
+    console.error("No auth token found");
+    setProfileError("Authentication required. Please log in.");
+    return;
+  }
+  if (!userId || typeof userId !== "string") {
+    console.error("Invalid userId:", userId);
+    setProfileError("Invalid user ID.");
+    setLoadingProfile(false);
+    return;
+  }
+  try {
+    setLoadingProfile(true);
+    setProfileError(null);
+    // Change the endpoint to fetch a specific user's resume instead of current
+    const response = await fetch(`${BACKEND_URL}/api/resumes/user-resume/${userId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("Fetch error response:", errorData);
+      throw new Error(`Failed to fetch resume: ${response.status}`);
     }
-    if (!userId || typeof userId !== "string") {
-      console.error("Invalid userId:", userId);
-      setProfileError("Invalid user ID.");
-      setLoadingProfile(false);
-      return;
-    }
-    try {
-      setLoadingProfile(true);
-      setProfileError(null);
-      const response = await fetch(`${BACKEND_URL}/api/resumes/current`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Fetch error response:", errorData);
-        throw new Error(`Failed to fetch resume: ${response.status}`);
-      }
-      const data = await response.json();
-      setCandidateDetails(data.resume);
-      setLoadingProfile(false);
-    } catch (err) {
-      console.error("Error fetching candidate details:", err);
-      setProfileError("Failed to load candidate details. Please try again.");
-      setLoadingProfile(false);
-    }
-  };
+    const data = await response.json();
+    setCandidateDetails(data.resume);
+    setLoadingProfile(false);
+  } catch (err) {
+    console.error("Error fetching candidate details:", err);
+    setProfileError("Failed to load candidate details. Please try again.");
+    setLoadingProfile(false);
+  }
+};
 
   const handleViewCandidates = () => {
     if (jobs.length > 0) {
