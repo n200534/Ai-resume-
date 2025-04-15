@@ -12,7 +12,7 @@ const stemmer = natural.PorterStemmer;
 const predictJobSuccess = (resume, job) => {
   try {
     if (!resume || !job) {
-      console.error("Missing resume or job object");
+      console.error("Missing resume or job object");  
       return 0;
     }
     
