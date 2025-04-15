@@ -1,24 +1,57 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, MouseEvent } from "react";
+
+interface Job {
+  _id: string;
+  title: string;
+  company: string;
+  location: string;
+  employmentType: string;
+  requiredExperience: number;
+  salary: { min: number; max: number; currency: string } | string;
+  description: string;
+  skills: string[];
+  postedDate: string;
+  applicants?: { userId: string }[];
+}
+
+interface User {
+  name?: string;
+  email?: string;
+}
+
+interface Candidate {
+  userId: string;
+  user?: User;
+  matchScore: number;
+}
+
+interface Resume {
+  experience?: string;
+  skills?: string[];
+  summarizedText?: string;
+}
 
 export default function MyJobsPage() {
-  const [selectedJobIndex, setSelectedJobIndex] = useState(0);
-  const [jobs, setJobs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [showCandidates, setShowCandidates] = useState(false);
-  const [candidates, setCandidates] = useState([]);
-  const [loadingCandidates, setLoadingCandidates] = useState(false);
-  const [selectedCandidate, setSelectedCandidate] = useState(null);
-  const [showProfile, setShowProfile] = useState(false);
-  const [candidateDetails, setCandidateDetails] = useState(null);
-  const [loadingProfile, setLoadingProfile] = useState(false);
-  const [profileError, setProfileError] = useState(null);
+  const [selectedJobIndex, setSelectedJobIndex] = useState<number>(0);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showCandidates, setShowCandidates] = useState<boolean>(false);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [loadingCandidates, setLoadingCandidates] = useState<boolean>(false);
+  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(
+    null
+  );
+  const [showProfile, setShowProfile] = useState<boolean>(false);
+  const [candidateDetails, setCandidateDetails] = useState<Resume | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState<boolean>(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   const BACKEND_URL = "http://localhost:5001";
 
-  const getAuthToken = () => {
+  const getAuthToken = (): string | null => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("token");
     }
@@ -41,21 +74,22 @@ export default function MyJobsPage() {
             "Content-Type": "application/json",
           },
         });
-        if (!response.ok)
+        if (!response.ok) {
           throw new Error(`Failed to fetch jobs: ${response.status}`);
-        const data = await response.json();
+        }
+        const data: { jobs: Job[] } = await response.json();
         setJobs(data.jobs);
-        setLoading(false);
-      } catch (err) {
+      } catch (err: unknown) {
         console.error("Error fetching jobs:", err);
         setError("Failed to load your jobs. Please try again.");
+      } finally {
         setLoading(false);
       }
     };
     fetchMyJobs();
   }, []);
 
-  const fetchCandidates = async (jobId) => {
+  const fetchCandidates = async (jobId: string): Promise<void> => {
     const token = getAuthToken();
     if (!token) return;
     try {
@@ -69,19 +103,20 @@ export default function MyJobsPage() {
           },
         }
       );
-      if (!response.ok)
+      if (!response.ok) {
         throw new Error(`Failed to fetch candidates: ${response.status}`);
-      const data = await response.json();
+      }
+      const data: { applicants: Candidate[] } = await response.json();
       console.log("Fetched candidates:", data.applicants); // Debug log
       setCandidates(data.applicants);
-      setLoadingCandidates(false);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Error fetching candidates:", err);
+    } finally {
       setLoadingCandidates(false);
     }
   };
 
-  const fetchCandidateDetails = async (userId) => {
+  const fetchCandidateDetails = async (userId: string): Promise<void> => {
     console.log("Fetching details for userId:", userId);
     const token = getAuthToken();
     if (!token) {
@@ -112,12 +147,12 @@ export default function MyJobsPage() {
         console.error("Fetch error response:", errorData);
         throw new Error(`Failed to fetch resume: ${response.status}`);
       }
-      const data = await response.json();
+      const data: { resume: Resume } = await response.json();
       setCandidateDetails(data.resume);
-      setLoadingProfile(false);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Error fetching candidate details:", err);
       setProfileError("Failed to load candidate details. Please try again.");
+    } finally {
       setLoadingProfile(false);
     }
   };
@@ -130,7 +165,7 @@ export default function MyJobsPage() {
     }
   };
 
-  const handleDeleteJob = async (jobId) => {
+  const handleDeleteJob = async (jobId: string): Promise<void> => {
     const token = getAuthToken();
     if (!token) return;
     try {
@@ -141,25 +176,29 @@ export default function MyJobsPage() {
           "Content-Type": "application/json",
         },
       });
-      if (!response.ok)
+      if (!response.ok) {
         throw new Error(`Failed to delete job: ${response.status}`);
+      }
       setJobs(jobs.filter((job) => job._id !== jobId));
-      setSelectedJobIndex(Math.max(0, jobs.length - 2));
-    } catch (err) {
+      setSelectedJobIndex((prev) => Math.min(prev, jobs.length - 2));
+    } catch (err: unknown) {
       console.error("Error deleting job:", err);
     }
   };
 
-  const formatSalary = (salary) => {
+  const formatSalary = (
+    salary: { min: number; max: number; currency: string } | string
+  ): string => {
     if (!salary) return "Not specified";
     if (typeof salary === "string") return salary;
-    if (salary.min && salary.max && salary.currency) {
-      return `${salary.currency}${salary.min} - ${salary.currency}${salary.max}`;
+    const { min, max, currency } = salary;
+    if (min != null && max != null && currency) {
+      return `${currency}${min} - ${currency}${max}`;
     }
-    return JSON.stringify(salary);
+    return "Invalid salary format";
   };
 
-  const handleViewProfile = (candidate) => {
+  const handleViewProfile = (candidate: Candidate) => {
     console.log("Viewing profile for candidate:", candidate); // Debug log
     if (!candidate.userId) {
       console.error("No userId for candidate:", candidate);
@@ -175,9 +214,9 @@ export default function MyJobsPage() {
 
   // Handle outside click to close sidebar
   useEffect(() => {
-    const handleOutsideClick = (event) => {
+    const handleOutsideClick = (event: globalThis.MouseEvent) => {
       const sidebar = document.querySelector(".candidate-sidebar");
-      if (showProfile && sidebar && !sidebar.contains(event.target)) {
+      if (showProfile && sidebar && !sidebar.contains(event.target as Node)) {
         setShowProfile(false);
       }
     };
@@ -188,7 +227,7 @@ export default function MyJobsPage() {
     };
   }, [showProfile]);
 
-  if (loading)
+  if (loading) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50 text-[#162660]">
         <div className="flex flex-col items-center">
@@ -197,7 +236,9 @@ export default function MyJobsPage() {
         </div>
       </div>
     );
-  if (error)
+  }
+
+  if (error) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50">
         <div className="bg-white p-8 rounded-lg shadow-md border-l-4 border-red-500 max-w-md">
@@ -212,7 +253,9 @@ export default function MyJobsPage() {
         </div>
       </div>
     );
-  if (jobs.length === 0)
+  }
+
+  if (jobs.length === 0) {
     return (
       <div className="h-screen flex items-center justify-center flex-col bg-gray-50">
         <div className="bg-white p-10 rounded-xl shadow-md max-w-md text-center">
@@ -248,6 +291,7 @@ export default function MyJobsPage() {
         </div>
       </div>
     );
+  }
 
   const selectedJob = jobs[selectedJobIndex];
 
@@ -328,8 +372,9 @@ export default function MyJobsPage() {
                       confirm(
                         "Are you sure you want to delete this job posting?"
                       )
-                    )
+                    ) {
                       handleDeleteJob(job._id);
+                    }
                   }}
                 >
                   <svg
@@ -388,14 +433,14 @@ export default function MyJobsPage() {
         <div className="p-8 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
           <div className="flex items-center space-x-4">
             <div className="w-16 h-16 bg-[#162660] text-white rounded-full flex items-center justify-center text-2xl font-bold shadow-md">
-              {selectedJob?.company?.charAt(0)}
+              {selectedJob?.company?.charAt(0) || "J"}
             </div>
             <div>
               <h2 className="text-lg font-medium text-[#162035]">
-                {selectedJob?.company}
+                {selectedJob?.company || "Unknown Company"}
               </h2>
               <h1 className="text-2xl font-bold text-[#162660]">
-                {selectedJob?.title}
+                {selectedJob?.title || "Unknown Job"}
               </h1>
               <div className="flex items-center mt-1 text-sm text-gray-600">
                 <svg
@@ -417,7 +462,7 @@ export default function MyJobsPage() {
                     d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"
                   />
                 </svg>
-                {selectedJob?.location}
+                {selectedJob?.location || "Unknown Location"}
               </div>
             </div>
           </div>
@@ -578,24 +623,26 @@ export default function MyJobsPage() {
             <div className="grid grid-cols-2 gap-6 mb-6">
               <div className="bg-gray-50 p-4 rounded-lg">
                 <p className="text-sm text-gray-500 mb-1">Employment Type</p>
-                <p className="font-medium">{selectedJob?.employmentType}</p>
+                <p className="font-medium">
+                  {selectedJob?.employmentType || "N/A"}
+                </p>
               </div>
               <div className="bg-gray-50 p-4 rounded-lg">
                 <p className="text-sm text-gray-500 mb-1">
                   Experience Required
                 </p>
                 <p className="font-medium">
-                  {selectedJob?.requiredExperience}+ years
+                  {selectedJob?.requiredExperience || 0}+ years
                 </p>
               </div>
               <div className="bg-gray-50 p-4 rounded-lg">
                 <p className="text-sm text-gray-500 mb-1">Location</p>
-                <p className="font-medium">{selectedJob?.location}</p>
+                <p className="font-medium">{selectedJob?.location || "N/A"}</p>
               </div>
               <div className="bg-gray-50 p-4 rounded-lg">
                 <p className="text-sm text-gray-500 mb-1">Salary Range</p>
                 <p className="font-medium">
-                  {formatSalary(selectedJob?.salary)}
+                  {formatSalary(selectedJob?.salary || "")}
                 </p>
               </div>
             </div>
@@ -604,7 +651,7 @@ export default function MyJobsPage() {
                 Description
               </h4>
               <div className="bg-gray-50 p-4 rounded-lg text-gray-700 leading-relaxed">
-                {selectedJob?.description}
+                {selectedJob?.description || "No description available."}
               </div>
             </div>
             {selectedJob?.skills && selectedJob.skills.length > 0 && (
@@ -627,11 +674,13 @@ export default function MyJobsPage() {
             <div className="mt-6 pt-4 border-t border-gray-200 flex items-center justify-between text-sm text-gray-600">
               <p>
                 <span className="font-medium">Posted:</span>{" "}
-                {new Date(selectedJob?.postedDate).toLocaleDateString()}
+                {selectedJob?.postedDate
+                  ? new Date(selectedJob.postedDate).toLocaleDateString()
+                  : "N/A"}
               </p>
               <div className="flex space-x-2">
                 <a
-                  href={`/edit-job/${selectedJob?._id}`}
+                  href={`/edit-job/${selectedJob?._id || ""}`}
                   className="text-[#162660] hover:underline flex items-center"
                 >
                   <svg
@@ -657,14 +706,15 @@ export default function MyJobsPage() {
                       confirm(
                         "Are you sure you want to delete this job posting?"
                       )
-                    )
-                      handleDeleteJob(selectedJob?._id);
+                    ) {
+                      handleDeleteJob(selectedJob?._id || "");
+                    }
                   }}
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
-                    viewBox="0 0 24 24"
+                    viewBox="0 0 24 0 24"
                     strokeWidth={1.5}
                     stroke="currentColor"
                     className="w-4 h-4 mr-1"
@@ -748,7 +798,7 @@ export default function MyJobsPage() {
                   </div>
                 </div>
 
-                {candidateDetails.skills?.length > 0 && (
+                {candidateDetails.skills?.length ? (
                   <div className="mb-8">
                     <h4 className="text-lg font-semibold mb-4 text-[#162660]">
                       Skills
@@ -764,7 +814,7 @@ export default function MyJobsPage() {
                       ))}
                     </div>
                   </div>
-                )}
+                ) : null}
 
                 {candidateDetails.summarizedText && (
                   <div className="mb-8">

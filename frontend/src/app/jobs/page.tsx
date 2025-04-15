@@ -18,28 +18,74 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-const JobCard = ({ job, onViewJob }) => {
+interface PostedBy {
+  company?: string;
+}
+
+interface Job {
+  _id?: string;
+  title?: string;
+  position?: string;
+  company?: string;
+  location?: string;
+  description?: string;
+  salary?:
+    | { currency?: string; amount?: number; min?: number; max?: number }
+    | number
+    | string
+    | null;
+  skills?: string[];
+  postedBy?: PostedBy;
+  matchScore?: number;
+}
+
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
+
+interface Filters {
+  skills: string[];
+  location: string;
+  experience: number | null;
+  type: string;
+}
+
+interface JobCardProps {
+  job: Job;
+  onViewJob: (job: Job) => void;
+}
+
+const JobCard: React.FC<JobCardProps> = ({ job, onViewJob }) => {
   // Safely extract top 3 skills only
   const topSkills = Array.isArray(job.skills) ? job.skills.slice(0, 3) : [];
 
-  // Handle salary display safely - IMPROVED
-  const formatSalary = (salary) => {
+  // Handle salary display safely
+  const formatSalary = (
+    salary:
+      | { currency?: string; amount?: number; min?: number; max?: number }
+      | number
+      | string
+      | null
+  ): string => {
     if (!salary) return "Salary not specified";
 
     // If salary is an object with currency property, handle it
-    if (typeof salary === "object") {
+    if (typeof salary === "object" && salary !== null) {
       const currencySymbol =
         salary.currency === "USD" ? "$" : salary.currency || "$";
 
-      // Check if amount exists and is a number
-      if (salary.amount && !isNaN(salary.amount)) {
+      // Check if amount exists
+      if (salary.amount != null) {
         return `${currencySymbol}${salary.amount.toLocaleString()}`;
-      } else if (salary.min && salary.max) {
+      }
+      if (salary.min != null && salary.max != null) {
         // Handle salary range
         return `${currencySymbol}${salary.min.toLocaleString()} - ${currencySymbol}${salary.max.toLocaleString()}`;
-      } else {
-        return "Salary details available";
       }
+      return "Salary details available";
     }
 
     // If salary is a number
@@ -56,7 +102,7 @@ const JobCard = ({ job, onViewJob }) => {
   };
 
   // Function to determine score color based on match percentage
-  const getScoreColor = (score) => {
+  const getScoreColor = (score: number): string => {
     const percentage = score * 100;
     if (percentage >= 75) return "bg-green-500";
     if (percentage >= 30) return "bg-orange-500";
@@ -64,7 +110,7 @@ const JobCard = ({ job, onViewJob }) => {
   };
 
   // Function to determine text color based on match percentage
-  const getTextScoreColor = (score) => {
+  const getTextScoreColor = (score: number): string => {
     const percentage = score * 100;
     if (percentage >= 75) return "text-green-600";
     if (percentage >= 30) return "text-orange-600";
@@ -82,9 +128,7 @@ const JobCard = ({ job, onViewJob }) => {
           <div className="flex items-center mt-1">
             <Building className="h-4 w-4 text-gray-400 mr-1 flex-shrink-0" />
             <p className="text-gray-700 font-medium text-sm truncate">
-              {job.company ||
-                (job.postedBy && job.postedBy.company) ||
-                "Unknown Company"}
+              {job.company || job.postedBy?.company || "Unknown Company"}
             </p>
           </div>
           <div className="flex items-center mt-1">
@@ -115,8 +159,8 @@ const JobCard = ({ job, onViewJob }) => {
         </div>
 
         {/* Skills section */}
-        <div className="flex flex-wrap gap-1.5 mb-2 h-14 max-h-6  overflow-hidden">
-          {topSkills.map((skill, idx) => (
+        <div className="flex flex-wrap gap-1.5 mb-2 h-14 max-h-6 overflow-hidden">
+          {topSkills.map((skill: string, idx: number) => (
             <span
               key={`skill-${idx}`}
               className="px-2 py-1 bg-gray-200 rounded-full text-xs text-[#162660] font-medium"
@@ -131,7 +175,7 @@ const JobCard = ({ job, onViewJob }) => {
           )}
         </div>
 
-        {/* Match score indicator - Fixed percentage display and styling */}
+        {/* Match score indicator - Commented out as in original */}
         {/* {job.matchScore !== undefined && (
           <div className="mt-auto mb-2">
             <div className="flex items-center justify-between mb-1">
@@ -173,7 +217,13 @@ const JobCard = ({ job, onViewJob }) => {
   );
 };
 
-const ResumeUploadPrompt = ({ onNavigate }) => (
+interface ResumeUploadPromptProps {
+  onNavigate: () => void;
+}
+
+const ResumeUploadPrompt: React.FC<ResumeUploadPromptProps> = ({
+  onNavigate,
+}) => (
   <div className="bg-white border border-indigo-100 rounded-lg p-5 mb-8 shadow-sm">
     <div className="flex items-start">
       <div className="flex-shrink-0 pt-0.5">
@@ -202,10 +252,24 @@ const ResumeUploadPrompt = ({ onNavigate }) => (
   </div>
 );
 
-const JobsCarousel = ({ title, jobsData, onViewJob, loading, onViewAll }) => {
-  const carouselRef = useRef(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
+interface JobsCarouselProps {
+  title: string;
+  jobsData: Job[];
+  onViewJob: (job: Job) => void;
+  loading: boolean;
+  onViewAll: () => void;
+}
+
+const JobsCarousel: React.FC<JobsCarouselProps> = ({
+  title,
+  jobsData,
+  onViewJob,
+  loading,
+  onViewAll,
+}) => {
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState<boolean>(false);
+  const [canScrollRight, setCanScrollRight] = useState<boolean>(false);
 
   useEffect(() => {
     const checkScrollability = () => {
@@ -311,11 +375,9 @@ const JobsCarousel = ({ title, jobsData, onViewJob, loading, onViewAll }) => {
             }}
           >
             {jobsData && jobsData.length > 0 ? (
-              jobsData.map((job) => (
+              jobsData.map((job, index) => (
                 <div
-                  key={
-                    job._id || `job-${Math.random().toString(36).substr(2, 9)}`
-                  }
+                  key={job._id || `job-${index}`}
                   className="scroll-snap-align-start"
                   style={{ scrollSnapAlign: "start" }}
                 >
@@ -338,19 +400,28 @@ const JobsCarousel = ({ title, jobsData, onViewJob, loading, onViewAll }) => {
   );
 };
 
-// Pagination controls component
-const PaginationControls = ({ pagination, onPageChange, loading }) => {
+interface PaginationControlsProps {
+  pagination: Pagination;
+  onPageChange: (page: number) => void;
+  loading: boolean;
+}
+
+const PaginationControls: React.FC<PaginationControlsProps> = ({
+  pagination,
+  onPageChange,
+  loading,
+}) => {
   const { page, pages, total } = pagination;
 
-  const handlePageChange = (newPage) => {
+  const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= pages && !loading) {
       onPageChange(newPage);
     }
   };
 
   // Generate page numbers to display (show current page, 2 before and 2 after)
-  const getPageNumbers = () => {
-    const pageNumbers = [];
+  const getPageNumbers = (): number[] => {
+    const pageNumbers: number[] = [];
     const maxPagesToShow = 5;
 
     if (pages <= maxPagesToShow) {
@@ -424,32 +495,33 @@ const PaginationControls = ({ pagination, onPageChange, loading }) => {
 
 export default function JobsPage() {
   const router = useRouter();
-  const [search, setSearch] = useState("");
-  const [allJobs, setAllJobs] = useState([]);
-  const [recommendedJobs, setRecommendedJobs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [recommendedLoading, setRecommendedLoading] = useState(true);
-  const [filters, setFilters] = useState({
+  const [search, setSearch] = useState<string>("");
+  const [allJobs, setAllJobs] = useState<Job[]>([]);
+  const [recommendedJobs, setRecommendedJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [recommendedLoading, setRecommendedLoading] = useState<boolean>(true);
+  const [filters, setFilters] = useState<Filters>({
     skills: [],
     location: "",
     experience: null,
     type: "",
   });
-  const [showFilters, setShowFilters] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [resumeNotFound, setResumeNotFound] = useState(false);
-  const [pagination, setPagination] = useState({
+  const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [resumeNotFound, setResumeNotFound] = useState<boolean>(false);
+  const [pagination, setPagination] = useState<Pagination>({
     page: 1,
     limit: 10,
     total: 0,
     pages: 0,
   });
-  const [recommendedPagination, setRecommendedPagination] = useState({
-    page: 1,
-    limit: 10,
-    total: 0,
-    pages: 0,
-  });
+  const [recommendedPagination, setRecommendedPagination] =
+    useState<Pagination>({
+      page: 1,
+      limit: 10,
+      total: 0,
+      pages: 0,
+    });
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
 
@@ -487,29 +559,30 @@ export default function JobsPage() {
     };
   }, []);
 
-  const buildQueryParams = () => {
+  const buildQueryParams = (): string => {
     const params = new URLSearchParams();
 
     // Add pagination params
-    params.append("page", pagination.page);
-    params.append("limit", pagination.limit);
+    params.append("page", pagination.page.toString());
+    params.append("limit", pagination.limit.toString());
 
     // Add search param if exists
     if (search) params.append("search", search);
 
     // Add filter params
-    if (filters.skills && filters.skills.length > 0) {
+    if (filters.skills.length > 0) {
       params.append("skills", filters.skills.join(","));
     }
 
     if (filters.location) params.append("location", filters.location);
-    if (filters.experience) params.append("experience", filters.experience);
+    if (filters.experience != null)
+      params.append("experience", filters.experience.toString());
     if (filters.type) params.append("type", filters.type);
 
     return params.toString();
   };
 
-  const fetchJobs = async () => {
+  const fetchJobs = async (): Promise<void> => {
     try {
       setLoading(true);
 
@@ -520,7 +593,8 @@ export default function JobsPage() {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
 
-      const data = await response.json();
+      const data: { jobs: Job[]; pagination?: Pagination } =
+        await response.json();
 
       // Handle the new response format with pagination
       if (data.jobs && Array.isArray(data.jobs)) {
@@ -534,7 +608,7 @@ export default function JobsPage() {
         console.error("Invalid jobs data format:", data);
         setAllJobs([]);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error fetching jobs:", error);
       setAllJobs([]);
     } finally {
@@ -542,7 +616,7 @@ export default function JobsPage() {
     }
   };
 
-  const fetchRecommendedJobs = async () => {
+  const fetchRecommendedJobs = async (): Promise<void> => {
     try {
       setRecommendedLoading(true);
       setResumeNotFound(false);
@@ -552,7 +626,7 @@ export default function JobsPage() {
         typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
       if (!token) {
-        console.log(
+        console.error(
           "No authentication token found, cannot fetch recommended jobs"
         );
         setRecommendedJobs([]);
@@ -561,8 +635,8 @@ export default function JobsPage() {
       }
 
       const params = new URLSearchParams();
-      params.append("page", recommendedPagination.page);
-      params.append("limit", recommendedPagination.limit);
+      params.append("page", recommendedPagination.page.toString());
+      params.append("limit", recommendedPagination.limit.toString());
 
       const response = await fetch(
         `${API_URL}/api/jobs/recommended?${params.toString()}`,
@@ -575,18 +649,19 @@ export default function JobsPage() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          console.log("Authentication failed for recommended jobs");
+          console.error("Authentication failed for recommended jobs");
         } else if (response.status === 404) {
-          console.log("Resume not found for job recommendations");
+          console.error("Resume not found for job recommendations");
           setResumeNotFound(true);
         } else {
-          console.log(`Error response status: ${response.status}`);
+          console.error(`Error response status: ${response.status}`);
         }
         setRecommendedJobs([]);
         return;
       }
 
-      const data = await response.json();
+      const data: { recommendedJobs: Job[]; pagination?: Pagination } =
+        await response.json();
 
       if (data.recommendedJobs && Array.isArray(data.recommendedJobs)) {
         setRecommendedJobs(data.recommendedJobs);
@@ -599,7 +674,7 @@ export default function JobsPage() {
         console.error("Invalid recommended jobs data format:", data);
         setRecommendedJobs([]);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error fetching recommended jobs:", error);
       setRecommendedJobs([]);
     } finally {
@@ -607,52 +682,51 @@ export default function JobsPage() {
     }
   };
 
-  const handleSearch = () => {
+  const handleSearch = (): void => {
     // Reset pagination to page 1 when searching
     setPagination({ ...pagination, page: 1 });
     fetchJobs();
   };
 
-  const handlePageChange = (newPage) => {
+  const handlePageChange = (newPage: number): void => {
     setPagination({ ...pagination, page: newPage });
     fetchJobs();
   };
 
-  const handleRecommendedPageChange = (newPage) => {
+  const handleRecommendedPageChange = (newPage: number): void => {
     setRecommendedPagination({ ...recommendedPagination, page: newPage });
     fetchRecommendedJobs();
   };
 
-  // In JobsPage.js, modify the handleViewJob function:
-  const handleViewJob = (job) => {
+  const handleViewJob = (job: Job): void => {
     // Store the selected job in localStorage to pass it between pages
     localStorage.setItem("selectedJobData", JSON.stringify(job));
     // Navigate to the view job page
     router.push("/jobs/viewjob");
   };
 
-  const handleKeyPress = (e) => {
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === "Enter") {
       handleSearch();
     }
   };
 
-  const handleApplyFilters = () => {
+  const handleApplyFilters = (): void => {
     setShowFilters(false);
     // Reset pagination to page 1 when applying filters
     setPagination({ ...pagination, page: 1 });
     fetchJobs();
   };
 
-  const handleViewAllJobs = () => {
+  const handleViewAllJobs = (): void => {
     router.push("/jobs/all");
   };
 
-  const handleViewAllRecommended = () => {
+  const handleViewAllRecommended = (): void => {
     router.push("/jobs/recommended");
   };
 
-  const navigateToResumeUpload = () => {
+  const navigateToResumeUpload = (): void => {
     router.push("/profile/resume");
   };
 
@@ -729,7 +803,10 @@ export default function JobsPage() {
                   onChange={(e) =>
                     setFilters({
                       ...filters,
-                      skills: e.target.value.split(",").map((s) => s.trim()),
+                      skills: e.target.value
+                        .split(",")
+                        .map((s) => s.trim())
+                        .filter((s) => s),
                     })
                   }
                 />
@@ -756,7 +833,7 @@ export default function JobsPage() {
                   type="number"
                   className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                   placeholder="e.g. 3"
-                  value={filters.experience || ""}
+                  value={filters.experience ?? ""}
                   onChange={(e) =>
                     setFilters({
                       ...filters,

@@ -192,8 +192,12 @@ export default function RecruiterJobPostPage() {
       setTimeout(() => {
         setShowSuccessPopup(false);
       }, 3000);
-    } catch (err) {
-      setError(err.message || "An error occurred while posting the job");
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "An error occurred while posting the job"
+      );
     } finally {
       setIsLoading(false);
     }
