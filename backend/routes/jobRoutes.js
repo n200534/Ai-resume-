@@ -648,4 +648,53 @@ router.get("/:jobId/applicants", authMiddleware, async (req, res) => {
   }
 });
 
+/**
+ * @route GET /api/applications/status
+ * @desc Get application status for the current user (which jobs they've applied to)
+ * @access Private
+ */
+router.get("/applications/status", authMiddleware, async (req, res) => {
+  try {
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({ error: "User not authenticated properly" });
+    }
+
+    const userId = new mongoose.Types.ObjectId(req.user.userId);
+
+    // Find all jobs where the current user is an applicant
+    const jobs = await Job.find(
+      {
+        "applicants.userId": userId,
+      },
+      {
+        _id: 1, // Only return the job ID
+        "applicants.$": 1, // And the matching applicant
+      }
+    );
+
+    // Format the response to include jobId and application date
+    const applications = jobs.map((job) => {
+      const applicant = job.applicants.find(
+        (app) => app.userId.toString() === userId.toString()
+      );
+
+      return {
+        jobId: job._id,
+        appliedDate: applicant.appliedDate,
+        status: "applied", // You can expand this if you track different statuses
+      };
+    });
+
+    res.json({
+      applications,
+    });
+  } catch (error) {
+    console.error("Error fetching application status:", error);
+    res.status(500).json({
+      error: "Failed to fetch application status",
+      details: error.message,
+    });
+  }
+});
+
 module.exports = router;

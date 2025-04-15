@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
 
 export default function ViewJobPage() {
   const [jobs, setJobs] = useState([]);
@@ -12,6 +11,8 @@ export default function ViewJobPage() {
   const [showAtsScore, setShowAtsScore] = useState(false);
   const [atsAnalysis, setAtsAnalysis] = useState(null);
   const [atsLoading, setAtsLoading] = useState(false);
+  // Added: State to track applied jobs
+  const [applicationStatus, setApplicationStatus] = useState({});
 
   const getAuthToken = () => {
     return localStorage.getItem("token");
@@ -23,27 +24,21 @@ export default function ViewJobPage() {
         setIsLoading(true);
         setError(null);
 
-        // Check if there's a selected job passed from the JobsPage
         const passedJobData = localStorage.getItem("selectedJobData");
         let initialSelectedJob = null;
 
         if (passedJobData) {
           try {
-            // Parse the job data
             initialSelectedJob = JSON.parse(passedJobData);
-            // Set it as the selected job
             setSelectedJob(initialSelectedJob);
-            // Remove from localStorage to avoid stale data
             localStorage.removeItem("selectedJobData");
           } catch (e) {
             console.error("Error parsing passed job data:", e);
           }
         }
 
-        // Fetch recommended jobs regardless
         await fetchRecommendedJobs();
 
-        // If there was no passed job but we got recommended jobs, set the first one
         if (!initialSelectedJob && jobs.length > 0) {
           fetchJobDetails(jobs[0]._id);
         }
@@ -57,6 +52,42 @@ export default function ViewJobPage() {
 
     fetchInitialData();
   }, []);
+
+  // Added: Fetch application status for all jobs
+  const fetchApplicationStatus = async () => {
+    try {
+      const token = getAuthToken();
+      if (!token) return;
+
+      const response = await fetch(
+        "http://localhost:5001/api/jobs/applications/status",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Transform the data into an object with jobId as key and application status as value
+      const statusMap = {};
+      if (data.applications && Array.isArray(data.applications)) {
+        data.applications.forEach((app) => {
+          statusMap[app.jobId] = true;
+        });
+      }
+
+      setApplicationStatus(statusMap);
+    } catch (err) {
+      console.error("Failed to fetch application status:", err);
+    }
+  };
 
   const fetchRecommendedJobs = async () => {
     try {
@@ -87,6 +118,8 @@ export default function ViewJobPage() {
 
       if (data.recommendedJobs?.length > 0) {
         setJobs(data.recommendedJobs);
+        // Added: Fetch application status after getting jobs
+        await fetchApplicationStatus();
       } else {
         setJobs([]);
       }
@@ -118,7 +151,6 @@ export default function ViewJobPage() {
 
       const data = await response.json();
       setSelectedJob(data.job);
-      // Reset ATS score panel when changing jobs
       setShowAtsScore(false);
       setAtsAnalysis(null);
     } catch (err) {
@@ -143,6 +175,7 @@ export default function ViewJobPage() {
     }
   };
 
+  // Updated: Handle apply with local state update
   const handleApply = async (jobId) => {
     try {
       const token = getAuthToken();
@@ -171,6 +204,11 @@ export default function ViewJobPage() {
 
       const data = await response.json();
       alert("Application submitted successfully!");
+      // Added: Update application status locally
+      setApplicationStatus((prev) => ({
+        ...prev,
+        [jobId]: true,
+      }));
     } catch (err) {
       console.error("Failed to apply for job:", err);
       alert(
@@ -209,7 +247,6 @@ export default function ViewJobPage() {
   };
 
   const handleAtsScoreClick = async () => {
-    // Toggle the ATS score panel if already showing
     if (showAtsScore && atsAnalysis) {
       setShowAtsScore(!showAtsScore);
       return;
@@ -224,7 +261,6 @@ export default function ViewJobPage() {
       setAtsLoading(true);
       const token = getAuthToken();
 
-      // Fetch the current resume
       const resumeResponse = await fetch(
         "http://localhost:5001/api/resumes/current",
         {
@@ -243,19 +279,13 @@ export default function ViewJobPage() {
       }
 
       const resumeData = await resumeResponse.json();
-      console.log("Resume data:", resumeData); // Debug: Check what's being returned
-
       if (!resumeData.resume) {
         throw new Error("No resume found in response");
       }
 
-      // Fixed: Use the correct resume ID from the response
       const resumeId = resumeData.resume.id;
-
-      // Use the job description from the selected job
       const jobDescription = selectedJob.description;
 
-      // Send ATS score request with resumeId instead of full resume
       const response = await fetch(
         "http://localhost:5001/api/resumes/ats-score",
         {
@@ -279,7 +309,6 @@ export default function ViewJobPage() {
 
       const data = await response.json();
 
-      // Transform data to match the expected format
       const analysisData = {
         atsScore: data.atsAnalysis.atsScore || 50,
         keywordMatch: {
@@ -302,204 +331,409 @@ export default function ViewJobPage() {
     }
   };
 
-  const formatSalary = (salary) => {
-    if (!salary) return null;
+  // Added: Check if user has already applied for a job
+  const hasApplied = (jobId) => {
+    return applicationStatus[jobId] === true;
+  };
 
-    if (typeof salary === "object") {
-      const currency = salary.currency || "";
-      const amount = salary.amount || "";
-      return `${currency} ${amount}`;
+  const formatSalary = (salary) => {
+    if (!salary) return "Not specified";
+
+    if (typeof salary === "string") return salary;
+
+    if (salary.min && salary.max && salary.currency) {
+      return `${salary.currency}${salary.min} - ${salary.currency}${salary.max}`;
     }
 
-    return salary;
+    return JSON.stringify(salary);
   };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Loading recommended jobs...</p>
+      <div className="h-screen flex items-center justify-center bg-gray-50 text-[#162660]">
+        <div className="flex flex-col items-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#162660] mb-3"></div>
+          <p className="font-medium">Loading recommended jobs...</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-500">{error}</p>
-          <Button className="mt-4" onClick={() => window.location.reload()}>
-            Retry
-          </Button>
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white p-8 rounded-lg shadow-md border-l-4 border-red-500 max-w-md">
+          <h3 className="text-lg font-semibold text-red-600 mb-2">Error</h3>
+          <p className="text-gray-700">{error}</p>
+          <button
+            className="mt-4 bg-[#162660] text-white px-4 py-2 rounded hover:bg-[#162035] transition-colors"
+            onClick={() => window.location.reload()}
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 pt-4">
-      <div className="w-full max-w-6xl bg-white rounded-lg shadow-md flex overflow-hidden h-screen">
-        <div className="w-1/3 border-r border-gray-300 p-4 overflow-y-auto h-full">
-          <h2 className="text-sm font-medium text-gray-700 mb-2">
-            Top job picks for you
-          </h2>
-          <p className="text-xs text-gray-500 mb-4">
+    <div className="flex h-screen overflow-hidden font-sans bg-gray-50">
+      {/* Sidebar */}
+      <div className="w-1/3 border-r border-gray-200 bg-white shadow-sm overflow-y-auto">
+        <div className="p-6 border-b border-gray-200 bg-[#162660] text-white">
+          <h2 className="text-xl font-semibold">Recommended Jobs</h2>
+          <p className="text-sm opacity-80 mt-1">
             Based on your resume skills and interests
           </p>
+        </div>
+
+        <div className="py-4 px-4">
           {jobs.length === 0 ? (
-            <div className="text-center py-6 text-gray-500">
-              No recommended jobs found. Please upload or update your resume to
-              get personalized recommendations.
+            <div className="bg-white p-10 rounded-xl shadow-md text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#162660] text-white flex items-center justify-center">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="w-8 h-8"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 4.5v15m7.5-7.5h-15"
+                  />
+                </svg>
+              </div>
+              <h2 className="text-xl font-semibold mb-3 text-[#162660]">
+                No recommended jobs found
+              </h2>
+              <p className="text-gray-600 mb-6">
+                Upload or update your resume to get personalized
+                recommendations.
+              </p>
+              <a
+                href="/upload-resume"
+                className="bg-[#162660] text-white px-6 py-3 rounded-md hover:bg-[#162035] transition-colors inline-block font-medium"
+              >
+                Upload Resume
+              </a>
             </div>
           ) : (
-            <div className="space-y-2 overflow-y-auto">
-              {jobs.map((job) => (
-                <div
-                  key={job._id}
-                  className={`bg-gray-100 p-3 rounded flex items-center justify-between hover:bg-gray-200 transition cursor-pointer ${
-                    selectedJob?._id === job._id
-                      ? "border-l-4 border-[#162660]"
-                      : ""
-                  }`}
-                  onClick={() => handleJobSelect(job._id)}
-                >
-                  <div>
-                    <div className="text-sm font-semibold capitalize">
-                      {job.title}
+            jobs.map((job) => (
+              <div
+                key={job._id}
+                onClick={() => handleJobSelect(job._id)}
+                className={`p-4 rounded-lg cursor-pointer mb-3 transition border ${
+                  selectedJob?._id === job._id
+                    ? "border-[#162660] bg-[#162660]/5"
+                    : "border-gray-200 hover:border-[#162660]/30 hover:bg-gray-50"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold ${
+                        selectedJob?._id === job._id
+                          ? "bg-[#162660] text-white"
+                          : "bg-[#162660]/10 text-[#162660]"
+                      }`}
+                    >
+                      {job.company.charAt(0)}
                     </div>
-                    <div className="text-xs text-gray-600">{job.company}</div>
-                    <div className="text-xs text-gray-400">{job.location}</div>
+                    <div>
+                      <h4
+                        className={`font-medium ${
+                          selectedJob?._id === job._id
+                            ? "text-[#162660]"
+                            : "text-gray-800"
+                        }`}
+                      >
+                        {job.title}
+                      </h4>
+                      <p className="text-sm text-gray-600">{job.company}</p>
+                      <div className="flex items-center mt-1 text-xs text-gray-500">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          strokeWidth={1.5}
+                          stroke="currentColor"
+                          className="w-3 h-3 mr-1"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"
+                          />
+                        </svg>
+                        {job.location}
+                      </div>
+                    </div>
                   </div>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       handleRemove(job._id);
                     }}
-                    className="text-gray-500 hover:text-black text-sm font-bold px-2"
+                    className="text-gray-400 hover:text-red-500 transition-colors"
                   >
-                    ×
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={1.5}
+                      stroke="currentColor"
+                      className="w-5 h-5"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                      />
+                    </svg>
                   </button>
                 </div>
-              ))}
-            </div>
+                <div className="mt-2 flex items-center text-xs">
+                  <span className="bg-[#162660]/10 text-[#162660] px-2 py-1 rounded-full">
+                    {job.employmentType}
+                  </span>
+                </div>
+              </div>
+            ))
           )}
         </div>
+      </div>
 
-        <div className="w-2/3 p-8 overflow-y-auto h-full">
-          {jobDetailLoading ? (
-            <div className="flex justify-center items-center h-full">
-              <p>Loading job details...</p>
+      {/* Job Details */}
+      <div className="w-2/3 overflow-y-auto">
+        {jobDetailLoading ? (
+          <div className="h-full flex items-center justify-center bg-gray-50 text-[#162660]">
+            <div className="flex flex-col items-center">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#162660] mb-3"></div>
+              <p className="font-medium">Loading job details...</p>
             </div>
-          ) : selectedJob ? (
-            <>
-              <div className="text-gray-700 mb-4">
-                <div className="text-2xl font-semibold">
-                  {selectedJob.title}
+          </div>
+        ) : selectedJob ? (
+          <>
+            <div className="p-8 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+              <div className="flex items-center space-x-4">
+                <div className="w-16 h-16 bg-[#162660] text-white rounded-full flex items-center justify-center text-2xl font-bold shadow-md">
+                  {selectedJob.company.charAt(0)}
                 </div>
-                <div className="text-sm text-gray-500">
-                  {selectedJob.company}
-                </div>
-                <div className="text-sm text-gray-500">
-                  {selectedJob.location}
+                <div>
+                  <h2 className="text-lg font-medium text-[#162035]">
+                    {selectedJob.company}
+                  </h2>
+                  <h1 className="text-2xl font-bold text-[#162660]">
+                    {selectedJob.title}
+                  </h1>
+                  <div className="flex items-center mt-1 text-sm text-gray-600">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={1.5}
+                      stroke="currentColor"
+                      className="w-4 h-4 mr-1"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"
+                      />
+                    </svg>
+                    {selectedJob.location}
+                  </div>
                 </div>
               </div>
 
-              <div className="mb-4 flex gap-3">
-                <Button
-                  className="bg-[#162660] text-white"
-                  onClick={() => handleApply(selectedJob._id)}
-                >
-                  Apply
-                </Button>
-                <Button
-                  variant="outline"
+              <div className="mt-6 flex items-center gap-3">
+                {/* Updated: Conditional rendering for Apply/Applied button */}
+                {hasApplied(selectedJob._id) ? (
+                  <button
+                    className="bg-gray-300 text-gray-600 px-4 py-2 rounded-md font-medium flex items-center shadow-sm cursor-not-allowed"
+                    disabled
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={1.5}
+                      stroke="currentColor"
+                      className="w-4 h-4 mr-1"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    Applied
+                  </button>
+                ) : (
+                  <button
+                    className="bg-[#162660] hover:bg-[#162035] text-white px-4 py-2 rounded-md transition-colors font-medium flex items-center shadow-sm"
+                    onClick={() => handleApply(selectedJob._id)}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={1.5}
+                      stroke="currentColor"
+                      className="w-4 h-4 mr-1"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    Apply
+                  </button>
+                )}
+                <button
+                  className={`${
+                    atsLoading
+                      ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                      : "bg-[#162660]/10 text-[#162660] hover:bg-[#162660]/20 border-[#162660]/20"
+                  } border px-4 py-2 rounded-md transition-colors font-medium flex items-center shadow-sm`}
                   onClick={handleAtsScoreClick}
                   disabled={atsLoading}
                 >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    stroke="currentColor"
+                    className="w-4 h-4 mr-1"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"
+                    />
+                  </svg>
                   {atsLoading ? "Analyzing..." : "ATS Score"}
-                </Button>
+                </button>
               </div>
+            </div>
 
+            <div className="p-8">
               {/* ATS Score Toggle Card */}
               {showAtsScore && atsAnalysis && (
-                <div className="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-200 transition-all">
-                  <div className="flex justify-between items-center mb-3">
-                    <h3 className="text-lg font-semibold text-blue-800">
+                <div className="mb-8 bg-white p-6 rounded-xl shadow-md">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-[#162660]">
                       ATS Analysis
                     </h3>
                     <button
                       onClick={() => setShowAtsScore(false)}
-                      className="text-blue-500 hover:text-blue-700"
+                      className="text-gray-400 hover:text-red-500"
                     >
-                      ×
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={1.5}
+                        stroke="currentColor"
+                        className="w-5 h-5"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
                     </button>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-white p-3 rounded shadow-sm">
+                    <div className="bg-gray-50 p-4 rounded-lg">
                       <div className="text-center">
-                        <div className="text-3xl font-bold text-blue-600">
+                        <div
+                          className={`text-3xl font-bold ${
+                            atsAnalysis.atsScore >= 75
+                              ? "text-green-600"
+                              : atsAnalysis.atsScore >= 50
+                              ? "text-yellow-600"
+                              : "text-red-600"
+                          }`}
+                        >
                           {atsAnalysis.atsScore}/100
                         </div>
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm text-gray-600">
                           Overall ATS Score
                         </div>
                       </div>
                     </div>
-
-                    <div className="bg-white p-3 rounded shadow-sm">
+                    <div className="bg-gray-50 p-4 rounded-lg">
                       <div className="text-center">
-                        <div className="text-3xl font-bold text-green-600">
-                          {atsAnalysis.keywordMatch?.matchPercentage || 0}%
+                        <div
+                          className={`text-3xl font-bold ${
+                            atsAnalysis.keywordMatch.matchPercentage >= 75
+                              ? "text-green-600"
+                              : atsAnalysis.keywordMatch.matchPercentage >= 50
+                              ? "text-yellow-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {atsAnalysis.keywordMatch.matchPercentage}%
                         </div>
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm text-gray-600">
                           Keyword Match
                         </div>
-                        <div className="text-xs text-gray-400">
-                          {atsAnalysis.keywordMatch?.matchedKeywords || 0} of{" "}
-                          {atsAnalysis.keywordMatch?.totalKeywords || 0}{" "}
-                          keywords found
+                        <div className="text-xs text-gray-500">
+                          {atsAnalysis.keywordMatch.matchedKeywords} of{" "}
+                          {atsAnalysis.keywordMatch.totalKeywords} keywords
+                          found
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-1 gap-3">
-                    <div className="bg-white p-3 rounded shadow-sm">
-                      <h4 className="font-semibold text-sm mb-2 text-blue-800">
+                  <div className="mt-6 space-y-4">
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h4 className="font-semibold text-sm mb-2 text-[#162660]">
                         Strengths
                       </h4>
-                      <ul className="list-disc list-inside text-sm">
+                      <ul className="list-disc list-inside text-sm text-gray-700">
                         {atsAnalysis.strengths?.map((strength, index) => (
-                          <li key={index} className="text-gray-700">
-                            {strength}
-                          </li>
+                          <li key={index}>{strength}</li>
                         ))}
                       </ul>
                     </div>
-
-                    <div className="bg-white p-3 rounded shadow-sm">
-                      <h4 className="font-semibold text-sm mb-2 text-amber-800">
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h4 className="font-semibold text-sm mb-2 text-[#162660]">
                         Areas for Improvement
                       </h4>
-                      <ul className="list-disc list-inside text-sm">
+                      <ul className="list-disc list-inside text-sm text-gray-700">
                         {atsAnalysis.improvementAreas?.map((area, index) => (
-                          <li key={index} className="text-gray-700">
-                            {area}
-                          </li>
+                          <li key={index}>{area}</li>
                         ))}
                       </ul>
                     </div>
-
-                    <div className="bg-white p-3 rounded shadow-sm">
-                      <h4 className="font-semibold text-sm mb-2 text-green-800">
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h4 className="font-semibold text-sm mb-2 text-[#162660]">
                         Recommended Changes
                       </h4>
-                      <ul className="list-disc list-inside text-sm">
+                      <ul className="list-disc list-inside text-sm text-gray-700">
                         {atsAnalysis.recommendedChanges?.map(
                           (recommendation, index) => (
-                            <li key={index} className="text-gray-700">
-                              {recommendation}
-                            </li>
+                            <li key={index}>{recommendation}</li>
                           )
                         )}
                       </ul>
@@ -508,39 +742,57 @@ export default function ViewJobPage() {
                 </div>
               )}
 
-              <div>
-                <h3 className="text-xl font-semibold mb-2">About the Job</h3>
-                <ul className="text-sm text-gray-800 mb-2">
-                  <li>
-                    <strong>Job Title:</strong> {selectedJob.title}
-                  </li>
-                  <li>
-                    <strong>Employment Type:</strong>{" "}
-                    {selectedJob.employmentType}
-                  </li>
-                  <li>
-                    <strong>Experience:</strong>{" "}
-                    {selectedJob.requiredExperience} years
-                  </li>
-                  <li>
-                    <strong>Location:</strong> {selectedJob.location}
-                  </li>
-                  {selectedJob.salary && (
-                    <li>
-                      <strong>Salary:</strong>{" "}
+              <div className="bg-white p-6 rounded-xl shadow-md">
+                <h3 className="text-xl font-bold mb-4 text-[#162660]">
+                  Job Details
+                </h3>
+
+                <div className="grid grid-cols-2 gap-6 mb-6">
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-sm text-gray-500 mb-1">
+                      Employment Type
+                    </p>
+                    <p className="font-medium">{selectedJob.employmentType}</p>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-sm text-gray-500 mb-1">
+                      Experience Required
+                    </p>
+                    <p className="font-medium">
+                      {selectedJob.requiredExperience} years
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-sm text-gray-500 mb-1">Location</p>
+                    <p className="font-medium">{selectedJob.location}</p>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-sm text-gray-500 mb-1">Salary Range</p>
+                    <p className="font-medium">
                       {formatSalary(selectedJob.salary)}
-                    </li>
-                  )}
-                </ul>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <h4 className="text-lg font-semibold mb-3 text-[#162660]">
+                    Description
+                  </h4>
+                  <div className="bg-gray-50 p-4 rounded-lg text-gray-700 leading-relaxed">
+                    {selectedJob.description}
+                  </div>
+                </div>
 
                 {selectedJob.skills && selectedJob.skills.length > 0 && (
-                  <div className="mt-4">
-                    <h4 className="font-semibold mb-1">Required Skills:</h4>
+                  <div className="mb-6">
+                    <h4 className="text-lg font-semibold mb-3 text-[#162660]">
+                      Required Skills
+                    </h4>
                     <div className="flex flex-wrap gap-2">
                       {selectedJob.skills.map((skill, index) => (
                         <span
                           key={index}
-                          className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded"
+                          className="bg-[#162660]/10 text-[#162660] px-3 py-1 rounded-full text-sm"
                         >
                           {skill}
                         </span>
@@ -548,25 +800,44 @@ export default function ViewJobPage() {
                     </div>
                   </div>
                 )}
-                <h4 className="font-semibold mb-1">Description:</h4>
-                <p className="text-sm text-gray-700 leading-relaxed">
-                  {selectedJob.description}
-                </p>
 
-                {selectedJob.postedDate && (
-                  <div className="mt-4 text-xs text-gray-500">
-                    Posted:{" "}
+                <div className="mt-6 pt-4 border-t border-gray-200">
+                  <p className="text-sm text-gray-600">
+                    <span className="font-medium">Posted:</span>{" "}
                     {new Date(selectedJob.postedDate).toLocaleDateString()}
-                  </div>
-                )}
+                  </p>
+                </div>
               </div>
-            </>
-          ) : (
-            <div className="text-gray-500 text-sm flex justify-center items-center h-full">
-              No job selected
             </div>
-          )}
-        </div>
+          </>
+        ) : (
+          <div className="h-full flex items-center justify-center bg-gray-50">
+            <div className="bg-white p-10 rounded-xl shadow-md max-w-md text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#162660] text-white flex items-center justify-center">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="w-8 h-8"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
+                  />
+                </svg>
+              </div>
+              <h2 className="text-xl font-semibold mb-3 text-[#162660]">
+                No job selected
+              </h2>
+              <p className="text-gray-600 mb-6">
+                Select a job from the list to view details.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
