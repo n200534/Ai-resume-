@@ -331,9 +331,43 @@ ${jobDescription}
     };
   }
 };
+const summarizeResume = async (resumeText) => {
+  try {
+    const prompt = `
+Summarize this resume in a concise way that captures the most important information (max 300 words).
+Focus on:
+- Professional summary
+- Key skills and expertise
+- Significant work experience
+- Notable achievements
+- Educational background
+
+Format the summary as plain text without sections or bullets.
+Return ONLY the summarized text with no additional explanations.
+
+Resume Text:
+${resumeText}
+`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const summaryText = parseGeminiResponse(response);
+
+    if (!summaryText) {
+      throw new Error("No summary text from Gemini");
+    }
+
+    return summaryText.trim();
+  } catch (err) {
+    console.error("Resume summarization error:", err);
+    // Create a basic summary as fallback
+    return "This resume appears to contain professional experience and skills related to technology. For more detailed information, please refer to the full resume text.";
+  }
+};
 
 module.exports = {
   analyzeResumeWithGemini,
   extractSkillsFromResume,
   calculateATSScore,
+  summarizeResume
 };

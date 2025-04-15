@@ -35,60 +35,62 @@ router.post("/upload", authMiddleware, async (req, res) => {
     if (!req.files || !req.files.resume) {
       return res.status(400).json({ error: "No resume file uploaded" });
     }
-
+    
     const resumeFile = req.files.resume;
     const jobDescription = req.body.jobDescription || "";
     const userId = req.user.userId;
-
+    
     // Validate file type
     if (!resumeFile.name.match(/\.(pdf)$/i)) {
       return res.status(400).json({ error: "Only PDF files are supported" });
     }
-
+    
     const uploadPath = path.join(__dirname, "../uploads", resumeFile.name);
-
+    
     // Ensure uploads directory exists
     const uploadsDir = path.join(__dirname, "../uploads");
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
-
+    
     // Save the file
     await resumeFile.mv(uploadPath);
-
+    
     // Read PDF
     const dataBuffer = fs.readFileSync(uploadPath);
     const pdfData = await pdf(dataBuffer);
-
+    
     // Optional: Delete the uploaded file after processing
     fs.unlinkSync(uploadPath);
-
+    
     // Perform Gemini analysis
-    const [resumeAnalysis, extractedSkills, atsScore] = await Promise.all([
+    const [resumeAnalysis, extractedSkills, atsScore, summarizedText] = await Promise.all([
       analyzeResumeWithGemini(pdfData.text),
       extractSkillsFromResume(pdfData.text),
       jobDescription
         ? calculateATSScore(pdfData.text, jobDescription)
         : Promise.resolve(null),
+      summarizeResume(pdfData.text)
     ]);
-
+    
     // Prepare data for MongoDB
     const resumeData = {
       fileName: resumeFile.name,
       rawText: pdfData.text,
+      summarizedText: summarizedText, // Add the summarized text here
       skills: extractedSkills,
       experience: resumeAnalysis.experience,
       feedback: resumeAnalysis.feedback,
       userId: userId,
       uploadDate: new Date(),
     };
-
+    
     // Check for existing resume and replace if it exists
     let savedResume;
     const existingResume = await Resume.findOne({ userId: userId }).sort({
       uploadDate: -1,
     });
-
+    
     if (existingResume) {
       // Update existing resume
       savedResume = await Resume.findByIdAndUpdate(
@@ -102,23 +104,23 @@ router.post("/upload", authMiddleware, async (req, res) => {
       savedResume = await Resume.create(resumeData);
       console.log(`Created new resume for user ${userId}`);
     }
-
+    
     // Save ATS analysis if available
     let atsAnalysisData = null;
     if (atsScore) {
       atsAnalysisData = await ATSAnalysis.create({
         resumeId: savedResume._id,
         jobDescription,
-        score: atsScore.score,
-        matchPercentage: atsScore.matchPercentage,
-        feedback: atsScore.feedback,
-        missingKeywords: atsScore.missingKeywords,
-        foundKeywords: atsScore.matchedKeywords,
+        score: atsScore.atsScore,
+        matchPercentage: atsScore.keywordMatch.matchPercentage,
+        strengths: atsScore.strengths,
+        improvementAreas: atsScore.improvementAreas,
+        recommendedChanges: atsScore.recommendedChanges,
         userId: userId,
         analysisDate: new Date(),
       });
     }
-
+    
     // Prepare response
     const response = {
       message: existingResume
@@ -126,6 +128,7 @@ router.post("/upload", authMiddleware, async (req, res) => {
         : "Resume uploaded, processed, and saved successfully",
       resumeId: savedResume._id,
       rawText: pdfData.text.substring(0, 200) + "...", // Truncated for response
+      summarizedText: summarizedText, // Include the summary in the response
       textLength: pdfData.text.length,
       analysis: {
         skills: extractedSkills,
@@ -133,13 +136,13 @@ router.post("/upload", authMiddleware, async (req, res) => {
         feedback: resumeAnalysis.feedback,
       },
     };
-
+    
     // Add ATS score if available
     if (atsScore && atsAnalysisData) {
       response.atsAnalysis = atsScore;
       response.atsAnalysisId = atsAnalysisData._id;
     }
-
+    
     res.json(response);
   } catch (error) {
     console.error("Resume upload error:", error);
@@ -503,6 +506,8 @@ router.get("/user-resume/:userId", authMiddleware, async (req, res) => {
         skills: resume.skills,
         experience: resume.experience,
         feedback: resume.feedback,
+        rawText: resume.rawText,
+        summarizedText:resume.summarizedText
       },
     });
   } catch (error) {

@@ -4,7 +4,7 @@ const mongoose = require("mongoose");
 const {
   predictJobSuccess,
   semanticJobMatching,
-} = require("../services/jobMatchingService");
+} = require("../services/jobMatchingservice");
 const Job = require("../models/JobModel");
 const Resume = require("../models/ResumeModel");
 const {
