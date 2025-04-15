@@ -81,45 +81,46 @@ export default function MyJobsPage() {
     }
   };
 
-// Updated fetchCandidateDetails function
-const fetchCandidateDetails = async (userId) => {
-  console.log("Fetching details for userId:", userId);
-  const token = getAuthToken();
-  if (!token) {
-    console.error("No auth token found");
-    setProfileError("Authentication required. Please log in.");
-    return;
-  }
-  if (!userId || typeof userId !== "string") {
-    console.error("Invalid userId:", userId);
-    setProfileError("Invalid user ID.");
-    setLoadingProfile(false);
-    return;
-  }
-  try {
-    setLoadingProfile(true);
-    setProfileError(null);
-    // Change the endpoint to fetch a specific user's resume instead of current
-    const response = await fetch(`${BACKEND_URL}/api/resumes/user-resume/${userId}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Fetch error response:", errorData);
-      throw new Error(`Failed to fetch resume: ${response.status}`);
+  const fetchCandidateDetails = async (userId) => {
+    console.log("Fetching details for userId:", userId);
+    const token = getAuthToken();
+    if (!token) {
+      console.error("No auth token found");
+      setProfileError("Authentication required. Please log in.");
+      return;
     }
-    const data = await response.json();
-    setCandidateDetails(data.resume);
-    setLoadingProfile(false);
-  } catch (err) {
-    console.error("Error fetching candidate details:", err);
-    setProfileError("Failed to load candidate details. Please try again.");
-    setLoadingProfile(false);
-  }
-};
+    if (!userId || typeof userId !== "string") {
+      console.error("Invalid userId:", userId);
+      setProfileError("Invalid user ID.");
+      setLoadingProfile(false);
+      return;
+    }
+    try {
+      setLoadingProfile(true);
+      setProfileError(null);
+      const response = await fetch(
+        `${BACKEND_URL}/api/resumes/user-resume/${userId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Fetch error response:", errorData);
+        throw new Error(`Failed to fetch resume: ${response.status}`);
+      }
+      const data = await response.json();
+      setCandidateDetails(data.resume);
+      setLoadingProfile(false);
+    } catch (err) {
+      console.error("Error fetching candidate details:", err);
+      setProfileError("Failed to load candidate details. Please try again.");
+      setLoadingProfile(false);
+    }
+  };
 
   const handleViewCandidates = () => {
     if (jobs.length > 0) {
@@ -171,6 +172,21 @@ const fetchCandidateDetails = async (userId) => {
     setShowProfile(true);
     fetchCandidateDetails(candidate.userId);
   };
+
+  // Handle outside click to close sidebar
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      const sidebar = document.querySelector(".candidate-sidebar");
+      if (showProfile && sidebar && !sidebar.contains(event.target)) {
+        setShowProfile(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, [showProfile]);
 
   if (loading)
     return (
@@ -237,29 +253,29 @@ const fetchCandidateDetails = async (userId) => {
 
   return (
     <div className="flex h-screen overflow-hidden font-sans bg-gray-50">
-      {/* Sidebar */}
+      {/* Sidebar (Job Listings) */}
       <div className="w-1/3 border-r border-gray-200 bg-white shadow-sm overflow-y-auto">
-        <div className="p-6 border-b border-gray-200 bg-[#162660] text-white">
-          <h2 className="text-xl font-semibold">My Job Postings</h2>
-          <p className="text-sm opacity-80 mt-1">
-            Manage your active job listings
+        <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-[#162660] to-[#1e3a8a] text-white">
+          <h2 className="text-2xl font-bold tracking-tight">My Job Postings</h2>
+          <p className="text-sm opacity-90 mt-2 font-medium">
+            Manage your active job listings with ease
           </p>
         </div>
-        <div className="py-4 px-4">
+        <div className="py-6 px-4">
           {jobs.map((job, index) => (
             <div
               key={job._id}
               onClick={() => setSelectedJobIndex(index)}
-              className={`p-4 rounded-lg cursor-pointer mb-3 transition border ${
+              className={`p-5 rounded-xl cursor-pointer mb-4 transition-all duration-200 border bg-white ${
                 selectedJobIndex === index
-                  ? "border-[#162660] bg-[#162660]/5"
-                  : "border-gray-200 hover:border-[#162660]/30 hover:bg-gray-50"
+                  ? "border-[#162660] bg-[#162660]/5 shadow-md"
+                  : "border-gray-100 hover:border-[#162660]/30 hover:bg-gray-50 hover:shadow-sm"
               }`}
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-4">
                   <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold ${
+                    className={`w-12 h-12 rounded-lg flex items-center justify-center text-xl font-bold transition-colors ${
                       selectedJobIndex === index
                         ? "bg-[#162660] text-white"
                         : "bg-[#162660]/10 text-[#162660]"
@@ -269,15 +285,17 @@ const fetchCandidateDetails = async (userId) => {
                   </div>
                   <div>
                     <h4
-                      className={`font-medium ${
+                      className={`text-lg font-semibold ${
                         selectedJobIndex === index
                           ? "text-[#162660]"
-                          : "text-gray-800"
+                          : "text-gray-900"
                       }`}
                     >
                       {job.title}
                     </h4>
-                    <p className="text-sm text-gray-600">{job.company}</p>
+                    <p className="text-sm text-gray-600 font-medium">
+                      {job.company}
+                    </p>
                     <div className="flex items-center mt-1 text-xs text-gray-500">
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -285,7 +303,7 @@ const fetchCandidateDetails = async (userId) => {
                         viewBox="0 0 24 24"
                         strokeWidth={1.5}
                         stroke="currentColor"
-                        className="w-3 h-3 mr-1"
+                        className="w-4 h-4 mr-1"
                       >
                         <path
                           strokeLinecap="round"
@@ -303,7 +321,7 @@ const fetchCandidateDetails = async (userId) => {
                   </div>
                 </div>
                 <button
-                  className="text-gray-400 hover:text-red-500 transition-colors"
+                  className="text-gray-400 hover:text-red-500 transition-colors p-2 rounded-full hover:bg-red-50"
                   onClick={(e) => {
                     e.stopPropagation();
                     if (
@@ -330,11 +348,11 @@ const fetchCandidateDetails = async (userId) => {
                   </svg>
                 </button>
               </div>
-              <div className="mt-2 flex items-center text-xs">
-                <span className="bg-[#162660]/10 text-[#162660] px-2 py-1 rounded-full">
+              <div className="mt-3 flex items-center text-xs space-x-3">
+                <span className="bg-[#162660]/10 text-[#162660] px-3 py-1.5 rounded-full font-medium">
                   {job.employmentType}
                 </span>
-                <span className="ml-2 text-gray-500">
+                <span className="text-gray-500 font-medium">
                   {job.applicants?.length || 0} applicants
                 </span>
               </div>
@@ -344,7 +362,7 @@ const fetchCandidateDetails = async (userId) => {
         <div className="p-4 border-t border-gray-200">
           <a
             href="/post-job"
-            className="flex items-center justify-center bg-[#162660]/10 text-[#162660] py-2 rounded-md hover:bg-[#162660]/20 transition-colors w-full font-medium"
+            className="flex items-center justify-center bg-[#162660] text-white py-3 rounded-lg hover:bg-[#1e3a8a] transition-colors w-full font-semibold shadow-sm"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -666,19 +684,19 @@ const fetchCandidateDetails = async (userId) => {
 
         {/* Candidate Profile Sidebar */}
         {showProfile && selectedCandidate && (
-          <div className="fixed inset-y-0 right-0 w-96 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out z-50 p-8 overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-[#162660]">
+          <div className="candidate-sidebar fixed inset-y-0 right-0 w-[28rem] bg-white shadow-2xl transform transition-transform duration-300 ease-in-out z-50 p-8 overflow-y-auto border-l border-gray-200">
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-2xl font-bold text-[#162660] tracking-tight">
                 Candidate Profile
               </h2>
               <button
                 onClick={() => setShowProfile(false)}
-                className="text-gray-500 hover:text-gray-700 transition-colors"
+                className="text-gray-500 hover:text-[#162660] transition-colors p-2 rounded-full hover:bg-gray-100"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
-                  viewBox="0 0 24  FS24"
+                  viewBox="0 0 24 24"
                   strokeWidth={1.5}
                   stroke="currentColor"
                   className="w-6 h-6"
@@ -691,56 +709,55 @@ const fetchCandidateDetails = async (userId) => {
                 </svg>
               </button>
             </div>
-
             {loadingProfile ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#162660]"></div>
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#162660]"></div>
               </div>
             ) : profileError ? (
-              <div className="bg-red-50 p-4 rounded-lg text-red-600">
+              <div className="bg-red-50 p-6 rounded-xl text-red-600 font-medium">
                 {profileError}
               </div>
             ) : candidateDetails ? (
               <>
-                <div className="flex items-center space-x-4 mb-6">
-                  <div className="w-16 h-16 bg-[#162660] text-white rounded-full flex items-center justify-center text-2xl font-bold">
+                <div className="flex items-center space-x-5 mb-8">
+                  <div className="w-16 h-16 bg-[#162660] text-white rounded-full flex items-center justify-center text-2xl font-bold shadow-md">
                     {selectedCandidate.user?.name?.charAt(0) || "A"}
                   </div>
                   <div>
                     <h3 className="text-xl font-semibold text-[#162035]">
                       {selectedCandidate.user?.name || "Anonymous Candidate"}
                     </h3>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-gray-600 font-medium">
                       {selectedCandidate.user?.email || "No email"}
                     </p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div>
-                    <p className="text-sm text-gray-500">Match Score</p>
-                    <p className="font-medium">
+                <div className="mb-8">
+                  <div className="bg-gray-50 p-4 rounded-xl mb-4">
+                    <p className="text-sm text-gray-500 mb-1">Match Score</p>
+                    <p className="font-semibold text-[#162660]">
                       {Math.round(selectedCandidate.matchScore)}%
                     </p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Experience</p>
-                    <p className="font-medium">
+                  <div className="bg-gray-50 p-4 rounded-xl">
+                    <p className="text-sm text-gray-500 mb-1">Experience</p>
+                    <p className="font-semibold text-[#162660]">
                       {candidateDetails.experience || "Not specified"}
                     </p>
                   </div>
                 </div>
 
                 {candidateDetails.skills?.length > 0 && (
-                  <div className="mb-6">
-                    <h4 className="text-lg font-semibold mb-3 text-[#162660]">
+                  <div className="mb-8">
+                    <h4 className="text-lg font-semibold mb-4 text-[#162660]">
                       Skills
                     </h4>
                     <div className="flex flex-wrap gap-2">
                       {candidateDetails.skills.map((skill, index) => (
                         <span
                           key={index}
-                          className="bg-[#162660]/10 text-[#162660] px-3 py-1 rounded-full text-sm"
+                          className="bg-[#162660]/10 text-[#162660] px-4 py-1.5 rounded-full text-sm font-medium"
                         >
                           {skill}
                         </span>
@@ -749,66 +766,22 @@ const fetchCandidateDetails = async (userId) => {
                   </div>
                 )}
 
-                <div className="mb-6">
-                  <h4 className="text-lg font-semibold mb-3 text-[#162660]">
-                    Resume
-                  </h4>
-                  {candidateDetails ? (
-                    <a
-                      href={`${BACKEND_URL}/api/resumes/current`}
-                      className="text-[#162660] hover:underline flex items-center"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        strokeWidth={1.5}
-                        stroke="currentColor"
-                        className="w-4 h-4 mr-1"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0-1.125-.504-1.125-1.125V11.25a9 9 0 00-9-9z"
-                        />
-                      </svg>
-                      {candidateDetails.fileName || "View Latest Resume"}
-                    </a>
-                  ) : (
-                    <p className="text-gray-600">No resume available.</p>
-                  )}
-                </div>
-
-                {candidateDetails.feedback && (
-                  <div className="mb-6">
-                    <h4 className="text-lg font-semibold mb-3 text-[#162660]">
-                      Resume Feedback
+                {candidateDetails.summarizedText && (
+                  <div className="mb-8">
+                    <h4 className="text-lg font-semibold mb-4 text-[#162660]">
+                      Resume Summary
                     </h4>
-                    <p className="text-gray-700 bg-gray-50 p-4 rounded-lg">
-                      {candidateDetails.feedback}
-                    </p>
+                    <div className="bg-gray-50 p-6 rounded-xl text-gray-700 leading-relaxed border border-gray-100">
+                      {candidateDetails.summarizedText}
+                    </div>
                   </div>
                 )}
               </>
             ) : (
-              <div className="text-gray-600">
+              <div className="text-gray-600 font-medium bg-gray-50 p-6 rounded-xl">
                 No candidate details available.
               </div>
             )}
-
-            <div className="mt-6 flex justify-end space-x-2">
-              <button
-                className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
-                onClick={() => setShowProfile(false)}
-              >
-                Close
-              </button>
-              <button className="bg-[#162660] text-white px-4 py-2 rounded-lg hover:bg-[#162035] transition-colors">
-                Schedule Call
-              </button>
-            </div>
           </div>
         )}
       </div>
