@@ -66,7 +66,7 @@ export default function RecruiterJobPostPage() {
     salary: "",
     requiredExperience: "",
     employmentType: "Full-time", // Updated to match schema enum
-    expiryDate: ""
+    expiryDate: "",
   });
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [jobPosted, setJobPosted] = useState(false);
@@ -90,7 +90,7 @@ export default function RecruiterJobPostPage() {
   const handlePostJob = async () => {
     // Reset error state
     setError("");
-    
+
     // Basic validation
     if (
       !formData.title ||
@@ -105,17 +105,19 @@ export default function RecruiterJobPostPage() {
 
     try {
       setIsLoading(true);
-      
+
       // Get the authentication token from localStorage
-      const token = localStorage.getItem('token'); 
-      
+      const token = localStorage.getItem("token");
+
       if (!token) {
         throw new Error("Authentication token not found. Please log in again.");
       }
-      
+
       // Parse skills into an array
-      const skillsArray = formData.skills.split(',').map(skill => skill.trim());
-      
+      const skillsArray = formData.skills
+        .split(",")
+        .map((skill) => skill.trim());
+
       // Parse required experience to a number
       let experienceNumber = 0;
       if (formData.requiredExperience) {
@@ -124,20 +126,22 @@ export default function RecruiterJobPostPage() {
           experienceNumber = parseInt(match[0], 10);
         }
       }
-      
+
       // Parse salary if provided
       let salary = {};
       if (formData.salary) {
-        const salaryMatch = formData.salary.match(/\$?([\d,]+)\s*-\s*\$?([\d,]+)/);
+        const salaryMatch = formData.salary.match(
+          /\$?([\d,]+)\s*-\s*\$?([\d,]+)/
+        );
         if (salaryMatch) {
           salary = {
-            min: parseInt(salaryMatch[1].replace(/,/g, ''), 10),
-            max: parseInt(salaryMatch[2].replace(/,/g, ''), 10),
-            currency: 'USD'
+            min: parseInt(salaryMatch[1].replace(/,/g, ""), 10),
+            max: parseInt(salaryMatch[2].replace(/,/g, ""), 10),
+            currency: "USD",
           };
         }
       }
-      
+
       // Create the payload to match backend schema
       const jobPayload = {
         title: formData.title,
@@ -148,15 +152,15 @@ export default function RecruiterJobPostPage() {
         salary: Object.keys(salary).length > 0 ? salary : undefined,
         requiredExperience: experienceNumber,
         employmentType: formData.employmentType,
-        expiryDate: formData.expiryDate || undefined
+        expiryDate: formData.expiryDate || undefined,
       };
-      
+
       // Call the API endpoint
       const response = await fetch("http://localhost:5001/api/jobs/create", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(jobPayload),
       });
@@ -181,7 +185,7 @@ export default function RecruiterJobPostPage() {
         salary: "",
         requiredExperience: "",
         employmentType: "Full-time",
-        expiryDate: ""
+        expiryDate: "",
       });
 
       // Automatically hide popup after 3 seconds
@@ -427,7 +431,7 @@ export default function RecruiterJobPostPage() {
       {/* Success Popup */}
       {showSuccessPopup && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50"
+          className="fixed inset-0  bg-opacity-30 flex items-center justify-center z-50"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="bg-white p-8 rounded-xl shadow-2xl text-center">
