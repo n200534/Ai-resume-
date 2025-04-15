@@ -4,58 +4,6 @@ import React, { useState, useEffect } from "react";
 import { FileText, CheckCircle2, Users, Eye, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-// Mock candidate data
-const mockCandidates = [
-  {
-    id: 1,
-    name: "John Doe",
-    avatar: "/api/placeholder/150/150",
-    matchScore: 85,
-    skills: ["React", "TypeScript", "Node.js"],
-    experience: "Senior Software Engineer",
-  },
-  {
-    id: 2,
-    name: "Emily Chen",
-    avatar: "/api/placeholder/150/150",
-    matchScore: 78,
-    skills: ["Python", "Machine Learning", "Data Science"],
-    experience: "Data Scientist",
-  },
-  {
-    id: 3,
-    name: "Michael Rodriguez",
-    avatar: "/api/placeholder/150/150",
-    matchScore: 92,
-    skills: ["Cloud Architecture", "AWS", "Kubernetes"],
-    experience: "DevOps Engineer",
-  },
-  {
-    id: 4,
-    name: "Sarah Kim",
-    avatar: "/api/placeholder/150/150",
-    matchScore: 80,
-    skills: ["UI/UX", "Design System", "Figma"],
-    experience: "Product Designer",
-  },
-  {
-    id: 5,
-    name: "Alex Johnson",
-    avatar: "/api/placeholder/150/150",
-    matchScore: 88,
-    skills: ["Backend", "Java", "Spring Boot"],
-    experience: "Backend Engineer",
-  },
-  {
-    id: 6,
-    name: "Rachel Green",
-    avatar: "/api/placeholder/150/150",
-    matchScore: 75,
-    skills: ["QA", "Test Automation", "Selenium"],
-    experience: "QA Engineer",
-  },
-];
-
 export default function RecruiterJobPostPage() {
   const [formData, setFormData] = useState({
     title: "",
@@ -72,6 +20,9 @@ export default function RecruiterJobPostPage() {
   const [jobPosted, setJobPosted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [postedJobId, setPostedJobId] = useState(null);
+  const [candidates, setCandidates] = useState([]);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
 
   // Handle form input changes
   const handleInputChange = (
@@ -84,6 +35,40 @@ export default function RecruiterJobPostPage() {
       ...prev,
       [name]: value,
     }));
+  };
+
+  // Fetch recommended candidates based on job ID
+  const fetchRecommendedCandidates = async (jobId) => {
+    try {
+      setLoadingCandidates(true);
+      
+      // Get token from localStorage
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        throw new Error("Authentication token not found. Please log in again.");
+      }
+      
+      const response = await fetch(`http://localhost:5001/api/jobs/${jobId}/recommended-candidates`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to fetch candidates");
+      }
+      
+      setCandidates(data.candidates || []);
+    } catch (err) {
+      console.error("Error fetching candidates:", err);
+      // Don't show error to user, just log it
+    } finally {
+      setLoadingCandidates(false);
+    }
   };
 
   // Handle job posting
@@ -167,6 +152,9 @@ export default function RecruiterJobPostPage() {
         throw new Error(data.error || "Failed to post job");
       }
 
+      // Store the job ID for fetching candidates
+      setPostedJobId(data.job._id);
+
       // Show success popup
       setShowSuccessPopup(true);
       setJobPosted(true);
@@ -183,6 +171,9 @@ export default function RecruiterJobPostPage() {
         employmentType: "Full-time",
         expiryDate: ""
       });
+
+      // Fetch recommended candidates based on the posted job
+      fetchRecommendedCandidates(data.job._id);
 
       // Automatically hide popup after 3 seconds
       setTimeout(() => {
@@ -374,48 +365,60 @@ export default function RecruiterJobPostPage() {
         </h2>
 
         {jobPosted ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 w-full">
-            {mockCandidates.map((candidate) => (
-              <div
-                key={candidate.id}
-                className="bg-white border border-gray-200 rounded-xl p-6 flex flex-col items-center text-center shadow-sm hover:shadow-md transition-shadow w-full"
-              >
-                <img
-                  src={candidate.avatar}
-                  alt={candidate.name}
-                  className="w-24 h-24 rounded-full mb-4 object-cover border-4 border-[#162660]/10"
-                />
-                <h3 className="text-lg font-semibold text-[#162660] mb-1">
-                  {candidate.name}
-                </h3>
-                <p className="text-gray-600 text-sm mb-2">
-                  {candidate.experience}
-                </p>
-                <div className="flex space-x-2 mb-4 justify-center">
-                  {candidate.skills.slice(0, 2).map((skill, index) => (
-                    <span
-                      key={index}
-                      className="bg-[#162660]/10 text-[#162660] text-xs px-2 py-1 rounded-full"
-                    >
-                      {skill}
+          loadingCandidates ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#162660] mx-auto mb-4"></div>
+              <p className="text-[#162660]">Finding matching candidates...</p>
+            </div>
+          ) : candidates.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 w-full">
+              {candidates.map((candidate) => (
+                <div
+                  key={candidate.userId}
+                  className="bg-white border border-gray-200 rounded-xl p-6 flex flex-col items-center text-center shadow-sm hover:shadow-md transition-shadow w-full"
+                >
+                  <img
+                    src="/api/placeholder/150/150"
+                    alt={candidate.name}
+                    className="w-24 h-24 rounded-full mb-4 object-cover border-4 border-[#162660]/10"
+                  />
+                  <h3 className="text-lg font-semibold text-[#162660] mb-1">
+                    {candidate.name}
+                  </h3>
+                  <p className="text-gray-600 text-sm mb-2">
+                    {candidate.experience || "Professional"}
+                  </p>
+                  <div className="flex space-x-2 mb-4 justify-center flex-wrap">
+                    {candidate.skills.slice(0, 2).map((skill, index) => (
+                      <span
+                        key={index}
+                        className="bg-[#162660]/10 text-[#162660] text-xs px-2 py-1 rounded-full"
+                      >
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <span className="text-xl font-bold text-green-600 mr-2">
+                      {candidate.matchScore}%
                     </span>
-                  ))}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex items-center text-[#162660] hover:bg-[#162660] hover:text-white"
+                    >
+                      <Eye className="mr-2" size={16} /> View Profile
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center justify-center">
-                  <span className="text-xl font-bold text-green-600 mr-2">
-                    {candidate.matchScore}%
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex items-center text-[#162660] hover:bg-[#162660] hover:text-white"
-                  >
-                    <Eye className="mr-2" size={16} /> View Profile
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-[#162660]/5 p-6 rounded-xl text-center text-[#162660]/70">
+              <Search className="mx-auto mb-4 text-[#162660]/50" size={48} />
+              <p>No matching candidates found. Try adjusting the job requirements.</p>
+            </div>
+          )
         ) : (
           <div className="bg-[#162660]/5 p-6 rounded-xl text-center text-[#162660]/70">
             <Search className="mx-auto mb-4 text-[#162660]/50" size={48} />

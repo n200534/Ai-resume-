@@ -696,5 +696,98 @@ router.get("/applications/status", authMiddleware, async (req, res) => {
     });
   }
 });
+/**
+ * @route GET /api/jobs/:jobId/recommended-candidates
+ * @desc Get recommended candidates for a specific job
+ * @access Private (Job creator only)
+ */
+router.get("/:jobId/recommended-candidates", authMiddleware, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.jobId)) {
+      return res.status(400).json({ error: "Invalid job ID format" });
+    }
 
+    const job = await Job.findById(req.params.jobId);
+
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    // Check if user is the job creator or admin
+    if (
+      job.postedBy.toString() !== req.user.userId &&
+      req.user.role !== "admin"
+    ) {
+      return res
+        .status(403)
+        .json({ error: "Not authorized to view candidates for this job" });
+    }
+
+    // Get the job skills
+    const jobSkills = job.skills || [];
+    
+    if (jobSkills.length === 0) {
+      return res.json({
+        message: "No skills specified for this job",
+        candidates: []
+      });
+    }
+
+    // Find all users with resumes (assuming a User model exists)
+    const User = mongoose.model("User");
+    const users = await User.find({
+      role: { $ne: "recruiter" } // Exclude recruiters
+    }).select("_id name email");
+
+    // Get the latest resume for each user
+    const candidatesWithScores = await Promise.all(
+      users.map(async (user) => {
+        try {
+          // Find the latest resume for this user
+          const resume = await Resume.findOne({ userId: user._id })
+            .sort({ uploadDate: -1 })
+            .select("_id skills experience")
+            .exec();
+
+          if (!resume) {
+            return null; // Skip users without resumes
+          }
+
+          // Calculate match score using the jobMatchingService
+          const matchScore = predictJobSuccess(resume, job);
+
+          // Return user with match score
+          return {
+            userId: user._id,
+            name: user.name,
+            email: user.email,
+            resumeId: resume._id,
+            skills: resume.skills?.slice(0, 3) || [],
+            experience: resume.experience || "",
+            matchScore: matchScore
+          };
+        } catch (err) {
+          console.error(`Error processing user ${user._id}:`, err);
+          return null;
+        }
+      })
+    );
+
+    // Filter out null values and sort by match score
+    const validCandidates = candidatesWithScores
+      .filter(candidate => candidate !== null && candidate.matchScore > 0)
+      .sort((a, b) => b.matchScore - a.matchScore);
+
+    res.json({
+      message: "Recommended candidates retrieved successfully",
+      candidates: validCandidates
+    });
+  } catch (error) {
+    console.error("Error fetching recommended candidates:", error);
+    res.status(500).json({
+      error: "Failed to fetch recommended candidates",
+      details: error.message
+    });
+  }
+});
 module.exports = router;
