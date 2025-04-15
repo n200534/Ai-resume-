@@ -4,6 +4,7 @@ const Schema = mongoose.Schema;
 const ResumeSchema = new Schema({
   fileName: String,
   rawText: String,
+  summarizedText: String,
   skills: [String],
   experience: String,
   feedback: String,
