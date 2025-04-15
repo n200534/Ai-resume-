@@ -550,12 +550,12 @@ export default function RecruiterJobPostPage() {
                   className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm hover:shadow-md transform hover:scale-105 transition-all duration-300 animate-fadeIn"
                 >
                   <div className="flex items-center space-x-4 mb-4">
-                    <div
+                    {/* <div
                       className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[#162660]/10 border border-[#162660]/10 flex items-center justify-center text-[#162660] font-semibold text-xl hover:bg-[#162660]/20 transition-colors"
                       aria-label={`Initial of ${candidate.name || "unknown"}`}
                     >
                       {candidate.name?.charAt(0)?.toUpperCase() || "-"}
-                    </div>
+                    </div> */}
                     <div>
                       <h3 className="text-lg font-semibold text-[#162660]">
                         {candidate.name}
@@ -626,7 +626,7 @@ export default function RecruiterJobPostPage() {
       {/* Success Popup */}
       {showSuccessPopup && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50"
+          className="fixed inset-0  bg-opacity-30 flex items-center justify-center z-50"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="bg-white p-8 rounded-xl shadow-2xl text-center">
