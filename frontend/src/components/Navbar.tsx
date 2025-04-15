@@ -76,14 +76,12 @@ export default function Navbar() {
               Post Job
             </Link>
             <Link
-              href="/job-seekers"
+              href="/my-jobs"
               className={`hover:text-[#162660] ${
-                pathname === "/job-seekers"
-                  ? "text-[#162660] font-semibold"
-                  : ""
+                pathname === "/my-jobs" ? "text-[#162660] font-semibold" : ""
               }`}
             >
-              Job Seekers
+              My Jobs
             </Link>
           </>
         ) : (

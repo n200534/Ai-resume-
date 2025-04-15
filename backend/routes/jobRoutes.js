@@ -15,6 +15,57 @@ const {
 const router = express.Router();
 
 /**
+ * @route GET /api/jobs/my-jobs
+ * @desc Get all jobs posted by the current user
+ * @access Private
+ */
+// IMPORTANT: Moved this route before the /:jobId route to ensure correct routing
+router.get("/my-jobs", authMiddleware, async (req, res) => {
+  try {
+    // Check if req.user and req.user.userId exist
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({
+        error: "User not authenticated properly",
+        details: "Authentication information is missing",
+      });
+    }
+
+    // Safely convert userId to ObjectId, handling potential invalid format
+    let userId;
+    try {
+      userId = new mongoose.Types.ObjectId(req.user.userId);
+    } catch (error) {
+      return res.status(400).json({
+        error: "Invalid user ID format",
+        details: "The user ID format is not valid",
+      });
+    }
+
+    // Debug logging
+    console.log("Fetching jobs for user:", userId);
+
+    // Find jobs where the current user is the poster
+    const jobs = await Job.find({ postedBy: userId })
+      .sort({ postedDate: -1 })
+      .populate("postedBy", "name company")
+      .exec();
+
+    console.log(`Found ${jobs.length} jobs for user ${userId}`);
+
+    res.json({
+      count: jobs.length,
+      jobs,
+    });
+  } catch (error) {
+    console.error("Error fetching user's jobs:", error);
+    res.status(500).json({
+      error: "Failed to fetch your jobs",
+      details: error.message,
+    });
+  }
+});
+
+/**
  * @route POST /api/jobs/create
  * @desc Create a new job posting
  * @access Private (Recruiters only)
@@ -46,6 +97,13 @@ router.post(
       let skillsArray = skills;
       if (typeof skills === "string") {
         skillsArray = skills.split(",").map((skill) => skill.trim());
+      }
+
+      // Make sure the userId is valid
+      if (!req.user || !req.user.userId) {
+        return res
+          .status(401)
+          .json({ error: "User not authenticated properly" });
       }
 
       const newJob = new Job({
@@ -163,6 +221,10 @@ router.get("/", async (req, res) => {
  */
 router.get("/match-jobs", authMiddleware, async (req, res) => {
   try {
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({ error: "User not authenticated properly" });
+    }
+
     const userId = new mongoose.Types.ObjectId(req.user.userId);
 
     // Find user's most recent resume
@@ -504,9 +566,83 @@ router.post("/:jobId/apply", authMiddleware, async (req, res) => {
       matchScore: matchScore,
     });
   } catch (error) {
-    console.error("YOU have already applied for this job");
+    console.error("Error applying for job:", error);
     res.status(500).json({
       error: "Failed to submit application",
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * @route GET /api/jobs/:jobId/applicants
+ * @desc Get all applicants for a specific job
+ * @access Private (Job creator only)
+ */
+router.get("/:jobId/applicants", authMiddleware, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.jobId)) {
+      return res.status(400).json({ error: "Invalid job ID format" });
+    }
+
+    const job = await Job.findById(req.params.jobId);
+
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    // Check if user is the job creator or admin
+    if (
+      job.postedBy.toString() !== req.user.userId &&
+      req.user.role !== "admin"
+    ) {
+      return res
+        .status(403)
+        .json({ error: "Not authorized to view applicants for this job" });
+    }
+
+    // Get detailed applicant information
+    const applicantsWithDetails = await Promise.all(
+      job.applicants.map(async (applicant) => {
+        try {
+          // Get user info (assuming you have a User model)
+          const User = mongoose.model("User");
+          const user = await User.findById(applicant.userId, "name email");
+
+          // Get resume info
+          const resume = await Resume.findById(applicant.resumeId);
+
+          return {
+            ...applicant.toObject(),
+            user: user ? user.toObject() : null,
+            resumeDetails: resume
+              ? {
+                  fileName: resume.fileName,
+                  fileSize: resume.fileSize,
+                }
+              : null,
+          };
+        } catch (err) {
+          console.error(
+            `Error fetching details for applicant ${applicant.userId}:`,
+            err
+          );
+          return applicant.toObject();
+        }
+      })
+    );
+
+    // Sort by match score (highest first)
+    applicantsWithDetails.sort((a, b) => b.matchScore - a.matchScore);
+
+    res.json({
+      count: applicantsWithDetails.length,
+      applicants: applicantsWithDetails,
+    });
+  } catch (error) {
+    console.error("Error fetching job applicants:", error);
+    res.status(500).json({
+      error: "Failed to fetch applicants",
       details: error.message,
     });
   }

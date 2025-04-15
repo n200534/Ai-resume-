@@ -623,9 +623,12 @@ export default function JobsPage() {
     fetchRecommendedJobs();
   };
 
+  // In JobsPage.js, modify the handleViewJob function:
   const handleViewJob = (job) => {
-    // MODIFIED: Now navigates to /viewjobs instead of /jobs/${jobId}
-    router.push("jobs/viewjob");
+    // Store the selected job in localStorage to pass it between pages
+    localStorage.setItem("selectedJobData", JSON.stringify(job));
+    // Navigate to the view job page
+    router.push("/jobs/viewjob");
   };
 
   const handleKeyPress = (e) => {

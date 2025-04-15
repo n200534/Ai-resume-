@@ -18,53 +18,83 @@ export default function ViewJobPage() {
   };
 
   useEffect(() => {
-    const fetchRecommendedJobs = async () => {
+    const fetchInitialData = async () => {
       try {
         setIsLoading(true);
         setError(null);
 
-        const token = getAuthToken();
-        if (!token) {
-          setError("You need to be logged in to view recommended jobs.");
-          setIsLoading(false);
-          return;
-        }
+        // Check if there's a selected job passed from the JobsPage
+        const passedJobData = localStorage.getItem("selectedJobData");
+        let initialSelectedJob = null;
 
-        const response = await fetch(
-          "http://localhost:5001/api/jobs/recommended",
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
+        if (passedJobData) {
+          try {
+            // Parse the job data
+            initialSelectedJob = JSON.parse(passedJobData);
+            // Set it as the selected job
+            setSelectedJob(initialSelectedJob);
+            // Remove from localStorage to avoid stale data
+            localStorage.removeItem("selectedJobData");
+          } catch (e) {
+            console.error("Error parsing passed job data:", e);
           }
-        );
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error("API error response:", errorText);
-          throw new Error(`HTTP error! Status: ${response.status}`);
         }
 
-        const data = await response.json();
+        // Fetch recommended jobs regardless
+        await fetchRecommendedJobs();
 
-        if (data.recommendedJobs?.length > 0) {
-          setJobs(data.recommendedJobs);
-          fetchJobDetails(data.recommendedJobs[0]._id);
-        } else {
-          setJobs([]);
-          setSelectedJob(null);
+        // If there was no passed job but we got recommended jobs, set the first one
+        if (!initialSelectedJob && jobs.length > 0) {
+          fetchJobDetails(jobs[0]._id);
         }
       } catch (err) {
-        console.error("Failed to fetch recommended jobs:", err);
-        setError("Failed to load recommended jobs. Please try again later.");
+        console.error("Failed to initialize view job page:", err);
+        setError("Failed to load job data. Please try again later.");
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchRecommendedJobs();
+    fetchInitialData();
   }, []);
+
+  const fetchRecommendedJobs = async () => {
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        setError("You need to be logged in to view recommended jobs.");
+        setIsLoading(false);
+        return;
+      }
+
+      const response = await fetch(
+        "http://localhost:5001/api/jobs/recommended",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("API error response:", errorText);
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.recommendedJobs?.length > 0) {
+        setJobs(data.recommendedJobs);
+      } else {
+        setJobs([]);
+      }
+    } catch (err) {
+      console.error("Failed to fetch recommended jobs:", err);
+      throw err;
+    }
+  };
 
   const fetchJobDetails = async (jobId) => {
     try {
@@ -177,8 +207,6 @@ export default function ViewJobPage() {
       throw err;
     }
   };
-
-  // In the handleAtsScoreClick function, replace the current resume fetching code with this:
 
   const handleAtsScoreClick = async () => {
     // Toggle the ATS score panel if already showing
