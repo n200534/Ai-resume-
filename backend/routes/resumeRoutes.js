@@ -8,6 +8,7 @@ const {
   analyzeResumeWithGemini,
   extractSkillsFromResume,
   calculateATSScore,
+  summarizeResume
 } = require("../services/geminiService");
 
 // Import MongoDB models
