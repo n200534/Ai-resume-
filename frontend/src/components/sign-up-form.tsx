@@ -19,7 +19,7 @@ interface ValidationError {
   field: string;
   message: string;
 }
-
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
 export function SignUpForm({
   className,
   ...props
@@ -53,7 +53,7 @@ export function SignUpForm({
     }
 
     try {
-      const response = await fetch("http://localhost:5001/api/auth/signup", {
+      const response = await fetch(`${API_URL}/api/auth/signup`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

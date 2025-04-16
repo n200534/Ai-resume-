@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
 export function LoginForm({
   className,
   ...props
@@ -39,7 +39,7 @@ export function LoginForm({
     }
 
     try {
-      const response = await fetch("http://localhost:5001/api/auth/login", {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

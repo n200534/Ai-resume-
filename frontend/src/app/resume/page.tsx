@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
 
 export default function ResumePage() {
   const [file, setFile] = useState<File | null>(null);
@@ -78,7 +79,7 @@ export default function ResumePage() {
     }
 
     try {
-      const response = await fetch("http://localhost:5001/api/resumes/upload", {
+      const response = await fetch(`${API_URL}/api/resumes/upload`, {
         method: "POST",
         body: formData,
         // If you have authentication, uncomment and adjust
