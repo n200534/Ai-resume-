@@ -1,0 +1,84 @@
+Ai-resume-/
+├─ backend/
+│  ├─ middlewares/
+│  │  └─ authMiddleware.js
+│  ├─ models/
+│  │  ├─ ATSAnalysisSchema.js
+│  │  ├─ JobModel.js
+│  │  ├─ ResumeModel.js
+│  │  └─ UserModel.js
+│  ├─ routes/
+│  │  ├─ authRoutes.js
+│  │  ├─ jobRoutes.js
+│  │  └─ resumeRoutes.js
+│  ├─ services/
+│  │  ├─ geminiService.js
+│  │  ├─ jobMatchingservice.js
+│  │  └─ pdfgenerator.js
+│  ├─ uploads/
+│  │  ├─ resume-1742916285970-Resume1.pdf
+│  │  ├─ resume-1742916510840-Resume1.pdf
+│  │  ├─ resume-1742921265116-full-stack-developer-resume-example.pdf
+│  │  └─ resume-1742921938731-full-stack-developer-resume-example.pdf
+│  ├─ .env
+│  ├─ .gitignore
+│  ├─ package-lock.json
+│  ├─ package.json
+│  └─ server.js
+├─ frontend/
+│  ├─ .next/
+│  │  ├─ cache/
+│  ├─ public/
+│  │  ├─ file.svg
+│  │  ├─ globe.svg
+│  │  ├─ next.svg
+│  │  ├─ vercel.svg
+│  │  └─ window.svg
+│  ├─ src/
+│  │  ├─ app/
+│  │  │  ├─ auth/
+│  │  │  │  ├─ login/
+│  │  │  │  │  └─ page.tsx
+│  │  │  │  └─ signup/
+│  │  │  │     └─ page.tsx
+│  │  │  ├─ jobs/
+│  │  │  │  ├─ viewjob/
+│  │  │  │  │  └─ page.tsx
+│  │  │  │  └─ page.tsx
+│  │  │  ├─ matched-candidates/
+│  │  │  │  └─ page.tsx
+│  │  │  ├─ my-jobs/
+│  │  │  │  └─ page.tsx
+│  │  │  ├─ post-job/
+│  │  │  │  └─ page.tsx
+│  │  │  ├─ resume/
+│  │  │  │  └─ page.tsx
+│  │  │  ├─ favicon.ico
+│  │  │  ├─ globals.css
+│  │  │  ├─ layout.tsx
+│  │  │  └─ page.tsx
+│  │  ├─ components/
+│  │  │  ├─ ui/
+│  │  │  │  ├─ button.tsx
+│  │  │  │  ├─ card.tsx
+│  │  │  │  ├─ input.tsx
+│  │  │  │  ├─ label.tsx
+│  │  │  │  ├─ navigation-menu.tsx
+│  │  │  │  └─ textarea.tsx
+│  │  │  ├─ login-form.tsx
+│  │  │  ├─ Navbar.tsx
+│  │  │  └─ sign-up-form.tsx
+│  │  └─ lib/
+│  │     └─ utils.ts
+│  ├─ .env.local
+│  ├─ .gitignore
+│  ├─ components.json
+│  ├─ next-env.d.ts
+│  ├─ next.config.ts
+│  ├─ package-lock.json
+│  ├─ package.json
+│  ├─ postcss.config.mjs
+│  ├─ README.md
+│  └─ tsconfig.json
+├─ .gitignore
+└─ project-tree.txt
