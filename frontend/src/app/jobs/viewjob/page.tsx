@@ -32,7 +32,7 @@ interface AtsAnalysis {
 }
 
 type ApplicationStatus = Record<string, boolean>;
-
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
 export default function ViewJobPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
@@ -90,8 +90,7 @@ export default function ViewJobPage() {
       const token = getAuthToken();
       if (!token) return;
 
-      const response = await fetch(
-        "[invalid url, do not cite]", // Placeholder preserved
+      const response = await fetch(`${API_URL}/api/jobs/applications/status`, 
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -124,7 +123,7 @@ export default function ViewJobPage() {
         return;
       }
 
-      const response = await fetch("[invalid url, do not cite]", {
+      const response = await fetch(`${API_URL}/api/jobs/recommended`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -155,7 +154,7 @@ export default function ViewJobPage() {
         throw new Error("Authentication required");
       }
 
-      const response = await fetch(`[invalid url, do not cite]`, {
+      const response = await fetch(`${API_URL}/api/jobs/${jobId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -200,7 +199,7 @@ export default function ViewJobPage() {
         return;
       }
 
-      const response = await fetch(`[invalid url, do not cite]`, {
+      const response = await fetch(`${API_URL}/api/jobs/${jobId}/apply`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -238,7 +237,7 @@ export default function ViewJobPage() {
         throw new Error("Authentication required");
       }
 
-      const response = await fetch("[invalid url, do not cite]", {
+      const response = await fetch(`${API_URL}/api/resumes/current`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -275,7 +274,7 @@ export default function ViewJobPage() {
         throw new Error("Authentication required");
       }
 
-      const resumeResponse = await fetch("[invalid url, do not cite]", {
+      const resumeResponse = await fetch(`${API_URL}/api/resumes/current`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -298,7 +297,7 @@ export default function ViewJobPage() {
       const resumeId = resumeData.resume.id;
       const jobDescription = selectedJob.description;
 
-      const response = await fetch("[invalid url, do not cite]", {
+      const response = await fetch(`${API_URL}/api/resumes/ats-score`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

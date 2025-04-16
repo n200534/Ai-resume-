@@ -14,13 +14,36 @@ const parseGeminiResponse = (response) => {
 
 const extractJsonFromText = (text) => {
   try {
+    // First clean the text by properly escaping problematic control characters
+    const cleanedText = text
+      .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // Remove control characters
+      .replace(/\\n/g, "\\n")
+      .replace(/\\r/g, "\\r")
+      .replace(/\\t/g, "\\t");
+    
     // More aggressive JSON extraction pattern
-    const jsonMatch = text.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
+    const jsonMatch = cleanedText.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
     if (jsonMatch) {
       return JSON.parse(jsonMatch[0]);
     }
   } catch (error) {
     console.error("Failed to parse extracted JSON:", error);
+    
+    // Additional fallback for extremely problematic JSON
+    try {
+      // Use more aggressive JSON cleanup and try to parse again
+      const sanitizedText = text
+        .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
+        .replace(/[^\x20-\x7E]/g, "")
+        .replace(/\\(?!["\\/bfnrt])/g, "\\\\");
+        
+      const jsonMatch = sanitizedText.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+    } catch (secondError) {
+      console.error("Failed to parse with sanitized JSON:", secondError);
+    }
   }
   return null;
 };
