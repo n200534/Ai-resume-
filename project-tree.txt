@@ -3,6 +3,7 @@ Ai-resume-/
 │  ├─ middlewares/
 │  │  └─ authMiddleware.js
 │  ├─ models/
+│  │  ├─ ATSAnalysisSchema.js
 │  │  ├─ JobModel.js
 │  │  ├─ ResumeModel.js
 │  │  └─ UserModel.js
@@ -40,14 +41,13 @@ Ai-resume-/
 │  │  │  │  │  └─ page.tsx
 │  │  │  │  └─ signup/
 │  │  │  │     └─ page.tsx
-│  │  │  ├─ candidate/
-│  │  │  │  └─ [id]/
-│  │  │  │     └─ page.tsx
-│  │  │  ├─ candidates/
-│  │  │  │  └─ page.tsx
 │  │  │  ├─ jobs/
+│  │  │  │  ├─ viewjob/
+│  │  │  │  │  └─ page.tsx
 │  │  │  │  └─ page.tsx
 │  │  │  ├─ matched-candidates/
+│  │  │  │  └─ page.tsx
+│  │  │  ├─ my-jobs/
 │  │  │  │  └─ page.tsx
 │  │  │  ├─ post-job/
 │  │  │  │  └─ page.tsx
