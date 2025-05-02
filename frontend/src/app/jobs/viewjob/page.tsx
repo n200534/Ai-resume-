@@ -2,49 +2,17 @@
 
 import React, { useState, useEffect } from "react";
 
-interface Job {
-  _id: string;
-  title: string;
-  company: string;
-  location: string;
-  employmentType: string;
-  requiredExperience: number;
-  salary: { min: number; max: number; currency: string } | string;
-  description: string;
-  skills: string[];
-  postedDate: string;
-}
-
-interface Application {
-  jobId: string;
-}
-
-interface AtsAnalysis {
-  atsScore: number;
-  keywordMatch: {
-    totalKeywords: number;
-    matchedKeywords: number;
-    matchPercentage: number;
-  };
-  strengths: string[];
-  improvementAreas: string[];
-  recommendedChanges: string[];
-}
-
-type ApplicationStatus = Record<string, boolean>;
-
 export default function ViewJobPage() {
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [jobDetailLoading, setJobDetailLoading] = useState<boolean>(false);
-  const [showAtsScore, setShowAtsScore] = useState<boolean>(false);
-  const [atsAnalysis, setAtsAnalysis] = useState<AtsAnalysis | null>(null);
-  const [atsLoading, setAtsLoading] = useState<boolean>(false);
-  const [applicationStatus, setApplicationStatus] = useState<ApplicationStatus>(
-    {}
-  );
+  const [jobs, setJobs] = useState([]);
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [jobDetailLoading, setJobDetailLoading] = useState(false);
+  const [showAtsScore, setShowAtsScore] = useState(false);
+  const [atsAnalysis, setAtsAnalysis] = useState(null);
+  const [atsLoading, setAtsLoading] = useState(false);
+  // Added: State to track applied jobs
+  const [applicationStatus, setApplicationStatus] = useState({});
 
   const getAuthToken = () => {
     return localStorage.getItem("token");
@@ -57,11 +25,11 @@ export default function ViewJobPage() {
         setError(null);
 
         const passedJobData = localStorage.getItem("selectedJobData");
-        let initialSelectedJob: Job | null = null;
+        let initialSelectedJob = null;
 
         if (passedJobData) {
           try {
-            initialSelectedJob = JSON.parse(passedJobData) as Job;
+            initialSelectedJob = JSON.parse(passedJobData);
             setSelectedJob(initialSelectedJob);
             localStorage.removeItem("selectedJobData");
           } catch (e) {
@@ -74,7 +42,7 @@ export default function ViewJobPage() {
         if (!initialSelectedJob && jobs.length > 0) {
           fetchJobDetails(jobs[0]._id);
         }
-      } catch (err: unknown) {
+      } catch (err) {
         console.error("Failed to initialize view job page:", err);
         setError("Failed to load job data. Please try again later.");
       } finally {
@@ -85,13 +53,14 @@ export default function ViewJobPage() {
     fetchInitialData();
   }, []);
 
+  // Added: Fetch application status for all jobs
   const fetchApplicationStatus = async () => {
     try {
       const token = getAuthToken();
       if (!token) return;
 
       const response = await fetch(
-        "[invalid url, do not cite]", // Placeholder preserved
+        "http://localhost:5001/api/jobs/applications/status",
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -104,13 +73,18 @@ export default function ViewJobPage() {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
 
-      const data: { applications: Application[] } = await response.json();
-      const statusMap: ApplicationStatus = {};
-      data.applications.forEach((app: Application) => {
-        statusMap[app.jobId] = true;
-      });
+      const data = await response.json();
+
+      // Transform the data into an object with jobId as key and application status as value
+      const statusMap = {};
+      if (data.applications && Array.isArray(data.applications)) {
+        data.applications.forEach((app) => {
+          statusMap[app.jobId] = true;
+        });
+      }
+
       setApplicationStatus(statusMap);
-    } catch (err: unknown) {
+    } catch (err) {
       console.error("Failed to fetch application status:", err);
     }
   };
@@ -124,12 +98,15 @@ export default function ViewJobPage() {
         return;
       }
 
-      const response = await fetch("[invalid url, do not cite]", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await fetch(
+        "http://localhost:5001/api/jobs/recommended",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -137,16 +114,22 @@ export default function ViewJobPage() {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
 
-      const data: { recommendedJobs: Job[] } = await response.json();
-      setJobs(data.recommendedJobs);
-      await fetchApplicationStatus();
-    } catch (err: unknown) {
+      const data = await response.json();
+
+      if (data.recommendedJobs?.length > 0) {
+        setJobs(data.recommendedJobs);
+        // Added: Fetch application status after getting jobs
+        await fetchApplicationStatus();
+      } else {
+        setJobs([]);
+      }
+    } catch (err) {
       console.error("Failed to fetch recommended jobs:", err);
       throw err;
     }
   };
 
-  const fetchJobDetails = async (jobId: string) => {
+  const fetchJobDetails = async (jobId) => {
     try {
       setJobDetailLoading(true);
 
@@ -155,7 +138,7 @@ export default function ViewJobPage() {
         throw new Error("Authentication required");
       }
 
-      const response = await fetch(`[invalid url, do not cite]`, {
+      const response = await fetch(`http://localhost:5001/api/jobs/${jobId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -166,22 +149,22 @@ export default function ViewJobPage() {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
 
-      const data: { job: Job } = await response.json();
+      const data = await response.json();
       setSelectedJob(data.job);
       setShowAtsScore(false);
       setAtsAnalysis(null);
-    } catch (err: unknown) {
+    } catch (err) {
       console.error("Failed to fetch job details:", err);
     } finally {
       setJobDetailLoading(false);
     }
   };
 
-  const handleJobSelect = (jobId: string) => {
+  const handleJobSelect = (jobId) => {
     fetchJobDetails(jobId);
   };
 
-  const handleRemove = (id: string) => {
+  const handleRemove = (id) => {
     const updatedJobs = jobs.filter((job) => job._id !== id);
     setJobs(updatedJobs);
 
@@ -192,7 +175,8 @@ export default function ViewJobPage() {
     }
   };
 
-  const handleApply = async (jobId: string) => {
+  // Updated: Handle apply with local state update
+  const handleApply = async (jobId) => {
     try {
       const token = getAuthToken();
       if (!token) {
@@ -200,13 +184,16 @@ export default function ViewJobPage() {
         return;
       }
 
-      const response = await fetch(`[invalid url, do not cite]`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(
+        `http://localhost:5001/api/jobs/${jobId}/apply`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -215,19 +202,18 @@ export default function ViewJobPage() {
         );
       }
 
-      await response.json();
+      const data = await response.json();
       alert("Application submitted successfully!");
+      // Added: Update application status locally
       setApplicationStatus((prev) => ({
         ...prev,
         [jobId]: true,
       }));
-    } catch (err: unknown) {
+    } catch (err) {
       console.error("Failed to apply for job:", err);
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Failed to apply for this job. Please try again later.";
-      alert(message);
+      alert(
+        err.message || "Failed to apply for this job. Please try again later."
+      );
     }
   };
 
@@ -238,20 +224,23 @@ export default function ViewJobPage() {
         throw new Error("Authentication required");
       }
 
-      const response = await fetch("[invalid url, do not cite]", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await fetch(
+        "http://localhost:5001/api/resumes/current",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
 
-      const data: { resume: { id: string } } = await response.json();
+      const data = await response.json();
       return data.resume;
-    } catch (err: unknown) {
+    } catch (err) {
       console.error("Failed to fetch current resume:", err);
       throw err;
     }
@@ -271,16 +260,16 @@ export default function ViewJobPage() {
     try {
       setAtsLoading(true);
       const token = getAuthToken();
-      if (!token) {
-        throw new Error("Authentication required");
-      }
 
-      const resumeResponse = await fetch("[invalid url, do not cite]", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
+      const resumeResponse = await fetch(
+        "http://localhost:5001/api/resumes/current",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       if (!resumeResponse.ok) {
         const errorData = await resumeResponse.json();
@@ -289,8 +278,7 @@ export default function ViewJobPage() {
         );
       }
 
-      const resumeData: { resume: { id: string } } =
-        await resumeResponse.json();
+      const resumeData = await resumeResponse.json();
       if (!resumeData.resume) {
         throw new Error("No resume found in response");
       }
@@ -298,26 +286,30 @@ export default function ViewJobPage() {
       const resumeId = resumeData.resume.id;
       const jobDescription = selectedJob.description;
 
-      const response = await fetch("[invalid url, do not cite]", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          resumeId: resumeId,
-          jobDescription: jobDescription,
-          jobId: selectedJob._id,
-        }),
-      });
+      const response = await fetch(
+        "http://localhost:5001/api/resumes/ats-score",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            resumeId: resumeId,
+            jobDescription: jobDescription,
+            jobId: selectedJob._id,
+          }),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to analyze resume");
       }
 
-      const data: { atsAnalysis: AtsAnalysis } = await response.json();
-      const analysisData: AtsAnalysis = {
+      const data = await response.json();
+
+      const analysisData = {
         atsScore: data.atsAnalysis.atsScore || 50,
         keywordMatch: {
           totalKeywords: data.atsAnalysis.keywordMatch?.totalKeywords || 0,
@@ -328,35 +320,32 @@ export default function ViewJobPage() {
         improvementAreas: data.atsAnalysis.improvementAreas || [],
         recommendedChanges: data.atsAnalysis.recommendedChanges || [],
       };
+
       setAtsAnalysis(analysisData);
       setShowAtsScore(true);
-    } catch (err: unknown) {
+    } catch (err) {
       console.error("Failed to get ATS score:", err);
-      const message =
-        err instanceof Error ? err.message : "Failed to analyze resume.";
-      alert(`Failed to analyze resume: ${message}`);
+      alert("Failed to analyze resume: " + err.message);
     } finally {
       setAtsLoading(false);
     }
   };
 
-  const hasApplied = (jobId: string): boolean => {
+  // Added: Check if user has already applied for a job
+  const hasApplied = (jobId) => {
     return applicationStatus[jobId] === true;
   };
 
-  const formatSalary = (
-    salary: { min: number; max: number; currency: string } | string
-  ) => {
+  const formatSalary = (salary) => {
     if (!salary) return "Not specified";
 
     if (typeof salary === "string") return salary;
 
-    const { min, max, currency } = salary;
-    if (min != null && max != null && currency) {
-      return `${currency}${min} - ${currency}${max}`;
+    if (salary.min && salary.max && salary.currency) {
+      return `${salary.currency}${salary.min} - ${salary.currency}${salary.max}`;
     }
 
-    return "Invalid salary format";
+    return JSON.stringify(salary);
   };
 
   if (isLoading) {
@@ -571,6 +560,7 @@ export default function ViewJobPage() {
               </div>
 
               <div className="mt-6 flex items-center gap-3">
+                {/* Updated: Conditional rendering for Apply/Applied button */}
                 {hasApplied(selectedJob._id) ? (
                   <button
                     className="bg-gray-300 text-gray-600 px-4 py-2 rounded-md font-medium flex items-center shadow-sm cursor-not-allowed"
@@ -643,6 +633,7 @@ export default function ViewJobPage() {
             </div>
 
             <div className="p-8">
+              {/* ATS Score Toggle Card */}
               {showAtsScore && atsAnalysis && (
                 <div className="mb-8 bg-white p-6 rounded-xl shadow-md">
                   <div className="flex items-center justify-between mb-4">
@@ -720,7 +711,7 @@ export default function ViewJobPage() {
                         Strengths
                       </h4>
                       <ul className="list-disc list-inside text-sm text-gray-700">
-                        {atsAnalysis.strengths.map((strength, index) => (
+                        {atsAnalysis.strengths?.map((strength, index) => (
                           <li key={index}>{strength}</li>
                         ))}
                       </ul>
@@ -730,7 +721,7 @@ export default function ViewJobPage() {
                         Areas for Improvement
                       </h4>
                       <ul className="list-disc list-inside text-sm text-gray-700">
-                        {atsAnalysis.improvementAreas.map((area, index) => (
+                        {atsAnalysis.improvementAreas?.map((area, index) => (
                           <li key={index}>{area}</li>
                         ))}
                       </ul>
@@ -740,7 +731,7 @@ export default function ViewJobPage() {
                         Recommended Changes
                       </h4>
                       <ul className="list-disc list-inside text-sm text-gray-700">
-                        {atsAnalysis.recommendedChanges.map(
+                        {atsAnalysis.recommendedChanges?.map(
                           (recommendation, index) => (
                             <li key={index}>{recommendation}</li>
                           )
@@ -792,7 +783,7 @@ export default function ViewJobPage() {
                   </div>
                 </div>
 
-                {selectedJob.skills.length > 0 && (
+                {selectedJob.skills && selectedJob.skills.length > 0 && (
                   <div className="mb-6">
                     <h4 className="text-lg font-semibold mb-3 text-[#162660]">
                       Required Skills
