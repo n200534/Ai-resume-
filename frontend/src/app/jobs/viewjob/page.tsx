@@ -2,21 +2,79 @@
 
 import React, { useState, useEffect } from "react";
 
-export default function ViewJobPage() {
-  const [jobs, setJobs] = useState([]);
-  const [selectedJob, setSelectedJob] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [jobDetailLoading, setJobDetailLoading] = useState(false);
-  const [showAtsScore, setShowAtsScore] = useState(false);
-  const [atsAnalysis, setAtsAnalysis] = useState(null);
-  const [atsLoading, setAtsLoading] = useState(false);
-  // Added: State to track applied jobs
-  const [applicationStatus, setApplicationStatus] = useState({});
+// Define interfaces for data structures
+interface Salary {
+  min?: number;
+  max?: number;
+  currency?: string;
+}
 
-  const getAuthToken = () => {
+interface Job {
+  _id: string;
+  title: string;
+  company: string;
+  location: string;
+  employmentType: string;
+  description: string;
+  requiredExperience?: number;
+  salary?: Salary | string;
+  skills?: string[];
+  postedDate: string;
+}
+
+interface AtsAnalysis {
+  atsScore: number;
+  keywordMatch: {
+    totalKeywords: number;
+    matchedKeywords: number;
+    matchPercentage: number;
+  };
+  strengths: string[];
+  improvementAreas: string[];
+  recommendedChanges: string[];
+}
+
+interface ApplicationStatus {
+  [jobId: string]: boolean;
+}
+
+interface Resume {
+  id: string;
+}
+
+interface ResumeResponse {
+  resume: Resume;
+}
+
+interface JobResponse {
+  job: Job;
+}
+
+interface RecommendedJobsResponse {
+  recommendedJobs: Job[];
+}
+
+interface ApplicationStatusResponse {
+  applications: { jobId: string }[];
+}
+
+export default function ViewJobPage() {
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [jobDetailLoading, setJobDetailLoading] = useState<boolean>(false);
+  const [showAtsScore, setShowAtsScore] = useState<boolean>(false);
+  const [atsAnalysis, setAtsAnalysis] = useState<AtsAnalysis | null>(null);
+  const [atsLoading, setAtsLoading] = useState<boolean>(false);
+  const [applicationStatus, setApplicationStatus] = useState<ApplicationStatus>(
+    {}
+  );
+
+  const getAuthToken = (): string | null => {
     return localStorage.getItem("token");
   };
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -25,11 +83,11 @@ export default function ViewJobPage() {
         setError(null);
 
         const passedJobData = localStorage.getItem("selectedJobData");
-        let initialSelectedJob = null;
+        let initialSelectedJob: Job | null = null;
 
         if (passedJobData) {
           try {
-            initialSelectedJob = JSON.parse(passedJobData);
+            initialSelectedJob = JSON.parse(passedJobData) as Job;
             setSelectedJob(initialSelectedJob);
             localStorage.removeItem("selectedJobData");
           } catch (e) {
@@ -51,32 +109,27 @@ export default function ViewJobPage() {
     };
 
     fetchInitialData();
-  }, []);
+  }, []); // Note: `jobs` dependency removed as `fetchRecommendedJobs` sets `jobs`
 
-  // Added: Fetch application status for all jobs
-  const fetchApplicationStatus = async () => {
+  const fetchApplicationStatus = async (): Promise<void> => {
     try {
       const token = getAuthToken();
       if (!token) return;
 
-      const response = await fetch(
-        "http://localhost:5001/api/jobs/applications/status",
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const response = await fetch(`${API_URL}/api/jobs/applications/status`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as ApplicationStatusResponse;
 
-      // Transform the data into an object with jobId as key and application status as value
-      const statusMap = {};
+      const statusMap: ApplicationStatus = {};
       if (data.applications && Array.isArray(data.applications)) {
         data.applications.forEach((app) => {
           statusMap[app.jobId] = true;
@@ -89,7 +142,7 @@ export default function ViewJobPage() {
     }
   };
 
-  const fetchRecommendedJobs = async () => {
+  const fetchRecommendedJobs = async (): Promise<void> => {
     try {
       const token = getAuthToken();
       if (!token) {
@@ -98,15 +151,12 @@ export default function ViewJobPage() {
         return;
       }
 
-      const response = await fetch(
-        "http://localhost:5001/api/jobs/recommended",
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const response = await fetch(`${API_URL}/api/jobs/recommended`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -114,11 +164,10 @@ export default function ViewJobPage() {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as RecommendedJobsResponse;
 
       if (data.recommendedJobs?.length > 0) {
         setJobs(data.recommendedJobs);
-        // Added: Fetch application status after getting jobs
         await fetchApplicationStatus();
       } else {
         setJobs([]);
@@ -129,7 +178,7 @@ export default function ViewJobPage() {
     }
   };
 
-  const fetchJobDetails = async (jobId) => {
+  const fetchJobDetails = async (jobId: string): Promise<void> => {
     try {
       setJobDetailLoading(true);
 
@@ -138,7 +187,7 @@ export default function ViewJobPage() {
         throw new Error("Authentication required");
       }
 
-      const response = await fetch(`http://localhost:5001/api/jobs/${jobId}`, {
+      const response = await fetch(`${API_URL}/api/jobs/${jobId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -149,7 +198,7 @@ export default function ViewJobPage() {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as JobResponse;
       setSelectedJob(data.job);
       setShowAtsScore(false);
       setAtsAnalysis(null);
@@ -160,11 +209,11 @@ export default function ViewJobPage() {
     }
   };
 
-  const handleJobSelect = (jobId) => {
+  const handleJobSelect = (jobId: string): void => {
     fetchJobDetails(jobId);
   };
 
-  const handleRemove = (id) => {
+  const handleRemove = (id: string): void => {
     const updatedJobs = jobs.filter((job) => job._id !== id);
     setJobs(updatedJobs);
 
@@ -175,8 +224,7 @@ export default function ViewJobPage() {
     }
   };
 
-  // Updated: Handle apply with local state update
-  const handleApply = async (jobId) => {
+  const handleApply = async (jobId: string): Promise<void> => {
     try {
       const token = getAuthToken();
       if (!token) {
@@ -184,16 +232,13 @@ export default function ViewJobPage() {
         return;
       }
 
-      const response = await fetch(
-        `http://localhost:5001/api/jobs/${jobId}/apply`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await fetch(`${API_URL}/api/jobs/${jobId}/apply`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -204,7 +249,6 @@ export default function ViewJobPage() {
 
       const data = await response.json();
       alert("Application submitted successfully!");
-      // Added: Update application status locally
       setApplicationStatus((prev) => ({
         ...prev,
         [jobId]: true,
@@ -212,33 +256,31 @@ export default function ViewJobPage() {
     } catch (err) {
       console.error("Failed to apply for job:", err);
       alert(
-        err.message || "Failed to apply for this job. Please try again later."
+        (err as Error).message ||
+          "Failed to apply for this job. Please try again later."
       );
     }
   };
 
-  const fetchCurrentResume = async () => {
+  const fetchCurrentResume = async (): Promise<Resume> => {
     try {
       const token = getAuthToken();
       if (!token) {
         throw new Error("Authentication required");
       }
 
-      const response = await fetch(
-        "http://localhost:5001/api/resumes/current",
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const response = await fetch(`${API_URL}/api/resumes/current`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as ResumeResponse;
       return data.resume;
     } catch (err) {
       console.error("Failed to fetch current resume:", err);
@@ -246,7 +288,7 @@ export default function ViewJobPage() {
     }
   };
 
-  const handleAtsScoreClick = async () => {
+  const handleAtsScoreClick = async (): Promise<void> => {
     if (showAtsScore && atsAnalysis) {
       setShowAtsScore(!showAtsScore);
       return;
@@ -261,15 +303,12 @@ export default function ViewJobPage() {
       setAtsLoading(true);
       const token = getAuthToken();
 
-      const resumeResponse = await fetch(
-        "http://localhost:5001/api/resumes/current",
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const resumeResponse = await fetch(`${API_URL}/api/resumes/current`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
 
       if (!resumeResponse.ok) {
         const errorData = await resumeResponse.json();
@@ -278,7 +317,7 @@ export default function ViewJobPage() {
         );
       }
 
-      const resumeData = await resumeResponse.json();
+      const resumeData = (await resumeResponse.json()) as ResumeResponse;
       if (!resumeData.resume) {
         throw new Error("No resume found in response");
       }
@@ -286,21 +325,18 @@ export default function ViewJobPage() {
       const resumeId = resumeData.resume.id;
       const jobDescription = selectedJob.description;
 
-      const response = await fetch(
-        "http://localhost:5001/api/resumes/ats-score",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            resumeId: resumeId,
-            jobDescription: jobDescription,
-            jobId: selectedJob._id,
-          }),
-        }
-      );
+      const response = await fetch(`${API_URL}/api/resumes/ats-score`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          resumeId: resumeId,
+          jobDescription: jobDescription,
+          jobId: selectedJob._id,
+        }),
+      });
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -309,7 +345,7 @@ export default function ViewJobPage() {
 
       const data = await response.json();
 
-      const analysisData = {
+      const analysisData: AtsAnalysis = {
         atsScore: data.atsAnalysis.atsScore || 50,
         keywordMatch: {
           totalKeywords: data.atsAnalysis.keywordMatch?.totalKeywords || 0,
@@ -325,18 +361,17 @@ export default function ViewJobPage() {
       setShowAtsScore(true);
     } catch (err) {
       console.error("Failed to get ATS score:", err);
-      alert("Failed to analyze resume: " + err.message);
+      alert("Failed to analyze resume: " + (err as Error).message);
     } finally {
       setAtsLoading(false);
     }
   };
 
-  // Added: Check if user has already applied for a job
-  const hasApplied = (jobId) => {
+  const hasApplied = (jobId: string): boolean => {
     return applicationStatus[jobId] === true;
   };
 
-  const formatSalary = (salary) => {
+  const formatSalary = (salary?: Salary | string): string => {
     if (!salary) return "Not specified";
 
     if (typeof salary === "string") return salary;
@@ -560,7 +595,6 @@ export default function ViewJobPage() {
               </div>
 
               <div className="mt-6 flex items-center gap-3">
-                {/* Updated: Conditional rendering for Apply/Applied button */}
                 {hasApplied(selectedJob._id) ? (
                   <button
                     className="bg-gray-300 text-gray-600 px-4 py-2 rounded-md font-medium flex items-center shadow-sm cursor-not-allowed"
@@ -609,7 +643,7 @@ export default function ViewJobPage() {
                     atsLoading
                       ? "bg-gray-300 text-gray-600 cursor-not-allowed"
                       : "bg-[#162660]/10 text-[#162660] hover:bg-[#162660]/20 border-[#162660]/20"
-                  } border px-4 py-2 rounded-md transition-colors font-medium flex items-center shadow-sm`}
+                  } border px-4 py-2 rounded-md transition-colors font font-medium flex items-center shadow-sm`}
                   onClick={handleAtsScoreClick}
                   disabled={atsLoading}
                 >
@@ -633,7 +667,6 @@ export default function ViewJobPage() {
             </div>
 
             <div className="p-8">
-              {/* ATS Score Toggle Card */}
               {showAtsScore && atsAnalysis && (
                 <div className="mb-8 bg-white p-6 rounded-xl shadow-md">
                   <div className="flex items-center justify-between mb-4">
@@ -759,7 +792,7 @@ export default function ViewJobPage() {
                       Experience Required
                     </p>
                     <p className="font-medium">
-                      {selectedJob.requiredExperience} years
+                      {selectedJob.requiredExperience ?? 0} years
                     </p>
                   </div>
                   <div className="bg-gray-50 p-4 rounded-lg">

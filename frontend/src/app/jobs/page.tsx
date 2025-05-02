@@ -257,7 +257,7 @@ interface JobsCarouselProps {
   jobsData: Job[];
   onViewJob: (job: Job) => void;
   loading: boolean;
-  onViewAll: () => void;
+  // onViewAll: () => void;
 }
 
 const JobsCarousel: React.FC<JobsCarouselProps> = ({
@@ -265,7 +265,7 @@ const JobsCarousel: React.FC<JobsCarouselProps> = ({
   jobsData,
   onViewJob,
   loading,
-  onViewAll,
+  // onViewAll,
 }) => {
   const carouselRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState<boolean>(false);
@@ -344,14 +344,14 @@ const JobsCarousel: React.FC<JobsCarouselProps> = ({
           >
             <ChevronRight size={18} />
           </Button>
-          <Button
+          {/* <Button
             variant="link"
             className="text-[#162660] font-medium hover:text-[#0e1a45] transition-colors"
             disabled={loading}
             onClick={onViewAll}
           >
             View All
-          </Button>
+          </Button> */}
         </div>
       </div>
 
@@ -523,7 +523,7 @@ export default function JobsPage() {
       pages: 0,
     });
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
   useEffect(() => {
     // Check authentication status
@@ -718,13 +718,13 @@ export default function JobsPage() {
     fetchJobs();
   };
 
-  const handleViewAllJobs = (): void => {
-    router.push("/jobs/all");
-  };
+  // const handleViewAllJobs = (): void => {
+  //   router.push("/jobs/all");
+  // };
 
-  const handleViewAllRecommended = (): void => {
-    router.push("/jobs/recommended");
-  };
+  // const handleViewAllRecommended = (): void => {
+  //   router.push("/jobs/recommended");
+  // };
 
   const navigateToResumeUpload = (): void => {
     router.push("/profile/resume");
@@ -886,15 +886,15 @@ export default function JobsPage() {
                 jobsData={recommendedJobs}
                 onViewJob={handleViewJob}
                 loading={recommendedLoading}
-                onViewAll={handleViewAllRecommended}
+                // onViewAll={handleViewAllRecommended}
               />
-              {recommendedJobs.length > 0 && (
+              {/* {recommendedJobs.length > 0 && (
                 <PaginationControls
                   pagination={recommendedPagination}
                   onPageChange={handleRecommendedPageChange}
                   loading={recommendedLoading}
                 />
-              )}
+              )} */}
             </>
           )}
 
@@ -903,16 +903,16 @@ export default function JobsPage() {
             jobsData={allJobs}
             onViewJob={handleViewJob}
             loading={loading}
-            onViewAll={handleViewAllJobs}
+            // onViewAll={handleViewAllJobs}
           />
 
-          {allJobs.length > 0 && (
+          {/* {allJobs.length > 0 && (
             <PaginationControls
               pagination={pagination}
               onPageChange={handlePageChange}
               loading={loading}
             />
-          )}
+          )} */}
         </main>
       </div>
     </div>

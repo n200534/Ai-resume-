@@ -32,7 +32,7 @@ export function SignUpForm({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -53,7 +53,7 @@ export function SignUpForm({
     }
 
     try {
-      const response = await fetch("http://localhost:5001/api/auth/signup", {
+      const response = await fetch(`${API_URL}/api/auth/signup`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -121,9 +121,7 @@ export function SignUpForm({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className={`border ${
-                    fieldErrors.name 
-                      ? "border-red-500" 
-                      : "border-[#162660]"
+                    fieldErrors.name ? "border-red-500" : "border-[#162660]"
                   } focus:ring-[#D0E6FD]`}
                 />
                 {fieldErrors.name && (
@@ -143,9 +141,7 @@ export function SignUpForm({
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className={`border ${
-                    fieldErrors.email 
-                      ? "border-red-500" 
-                      : "border-[#162660]"
+                    fieldErrors.email ? "border-red-500" : "border-[#162660]"
                   } focus:ring-[#D0E6FD]`}
                 />
                 {fieldErrors.email && (
@@ -167,9 +163,7 @@ export function SignUpForm({
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className={`border ${
-                    fieldErrors.password 
-                      ? "border-red-500" 
-                      : "border-[#162660]"
+                    fieldErrors.password ? "border-red-500" : "border-[#162660]"
                   } focus:ring-[#D0E6FD]`}
                 />
                 {fieldErrors.password && (

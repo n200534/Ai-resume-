@@ -7,6 +7,9 @@ const dotenv = require("dotenv");
 const router = express.Router();
 
 // Signup Route
+router.get("/dummy", async (req, res) => {
+  res.status(400).json({ msg: "this is from backend " });
+});
 router.post(
   "/signup",
   [
