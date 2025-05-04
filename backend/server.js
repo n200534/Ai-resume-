@@ -11,10 +11,25 @@ console.log(process.env.JWT_SECRET);
 console.log(process.env.GEMINI_API_KEY);
 const app = express();
 
+// Define allowed origins for CORS
+const allowedOrigins = [
+  "http://localhost:3000", // Local development
+  "https://jobfitai-delta.vercel.app", // Deployed frontend on Vercel
+];
+
 // Middleware
 app.use(
   cors({
-    origin: "http://localhost:3000", // Only allow your frontend
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g., mobile apps, curl requests)
+      if (!origin) return callback(null, true);
+      // Check if the request origin is in the allowedOrigins list
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        return callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true, // Allow sending cookies/auth headers
   })
 );
