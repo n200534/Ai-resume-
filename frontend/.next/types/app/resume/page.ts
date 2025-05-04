@@ -1,4 +1,4 @@
-// File: C:\Users\Akshay\Desktop\ai-resume-screener\frontend\src\app\resume\page.tsx
+// File: C:\Users\VYAS 09\Documents\Projects\Ai-resume-\frontend\src\app\resume\page.tsx
 import * as entry from '../../../../src/app/resume/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
