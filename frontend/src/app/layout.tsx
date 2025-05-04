@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "My App",
+  title: "JobFitAI",
   description: "An amazing Next.js application",
 };
 
