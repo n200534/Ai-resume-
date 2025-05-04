@@ -71,7 +71,7 @@ export default function RecruiterJobPostPage() {
   const [loadingProfile, setLoadingProfile] = useState<boolean>(false);
   const [profileError, setProfileError] = useState<string | null>(null);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
   // Handle form input changes
   const handleInputChange = (

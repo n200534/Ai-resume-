@@ -49,7 +49,7 @@ export default function MyJobsPage() {
   const [loadingProfile, setLoadingProfile] = useState<boolean>(false);
   const [profileError, setProfileError] = useState<string | null>(null);
 
-  const BACKEND_URL =  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
+  const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL;
 
   const getAuthToken = (): string | null => {
     if (typeof window !== "undefined") {

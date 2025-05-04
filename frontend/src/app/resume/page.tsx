@@ -77,6 +77,7 @@ export default function ResumePage() {
     if (jobDescription.trim()) {
       formData.append("jobDescription", jobDescription);
     }
+    const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
     try {
       const response = await fetch(`${API_URL}/api/resumes/upload`, {
@@ -84,8 +85,8 @@ export default function ResumePage() {
         body: formData,
         // If you have authentication, uncomment and adjust
         headers: {
-           Authorization: `Bearer ${localStorage.getItem("token")}`,
-         },
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
       });
 
       if (!response.ok) {
