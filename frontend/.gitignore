@@ -1,41 +1,127 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
+# Node.js
 /node_modules
 /.pnp
 .pnp.*
+
+# Yarn
 .yarn/*
 !.yarn/patches
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
 
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
+# npm & pnpm
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.pnpm-debug.log*
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# Caches
+.cache
+/.turbo
+/.vite
+/.eslintcache
+/.parcel-cache
+/.npm
+/.pnpm-store
+/.nuxt
+/.angular/cache
+/.cache-loader
+/.jest-cache
+/.jest-test-results.json
+/.next/cache
+/.vercel/cache
+
+# Next.js
+.next
+/out
+
+# Build output
+/build
+/dist
+/temp
+/tmp
+/public/build
+/.expo
+
+# Testing
+/coverage
+/.nyc_output
+/.cypress_cache
+/.cypress_output
+/cypress/screenshots
+/cypress/videos
+/.test-results
+
+# Environment variables
 .env*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# vercel
-.vercel
-
-# typescript
+# TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Logs
+*.log
+*.log.*
+
+# Misc
+.DS_Store
+*.pem
+*.key
+*.crt
+*.envrc
+*.swp
+
+# Debugging
+.vscode/*
+.idea/*
+*.sublime-project
+*.sublime-workspace
+.history
+.eslintcache
+
+# OS Files
+Thumbs.db
+desktop.ini
+
+# Vercel
+.vercel
+
+# Git
+.gitignore
+.gitmodules
+.gitattributes
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.orig
+*.old
+*.pid
+*.seed
+*.pid.lock
+
+# Editor-specific
+*.code-workspace
+*.iml
+.vscode/*
+.idea/*
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
