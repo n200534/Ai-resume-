@@ -57,7 +57,7 @@ app.use("/api/jobs", jobRoutes);
 // MongoDB Connection
 mongoose
   .connect(
-    "mongodb+srv://amavarapuakshaykumar:akshay_321@cluster0.fxgc0.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+    process.env.MONGO_URI
   )
   .then(() => {
     app.listen(5001, () => {
