@@ -16,7 +16,8 @@ const allowedOrigins = [
   "http://localhost:3000", // Local development
   "https://jobfitai-delta.vercel.app", // Deployed frontend on Vercel
   "https://jobfitai-e3rlq2zr8-n200534s-projects.vercel.app",
-  "https://jobfitai-n200534s-projects.vercel.app"
+  "https://jobfitai-n200534s-projects.vercel.app",
+  "https://ai-resume-mu-nine.vercel.app"
 ];
 
 // Middleware
