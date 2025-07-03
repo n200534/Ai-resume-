@@ -449,7 +449,7 @@ export default function ViewJobPage() {
                 recommendations.
               </p>
               <a
-                href="/upload-resume"
+                href="/resume"
                 className="bg-[#162660] text-white px-6 py-3 rounded-md hover:bg-[#162035] transition-colors inline-block font-medium"
               >
                 Upload Resume
